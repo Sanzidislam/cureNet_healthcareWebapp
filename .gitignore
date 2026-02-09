@@ -33,3 +33,8 @@ coverage/
 # Misc
 *.tgz
 .cache/
+
+#faltu
+/*.md
+#keep the readme
+!/README.md
