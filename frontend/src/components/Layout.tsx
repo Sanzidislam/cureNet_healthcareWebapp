@@ -1,13 +1,10 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { Link, Outlet, useMatch } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { APP_NAME } from '../utils/constants';
 
 const patientNav = [
   { to: '/app/dashboard', label: 'Dashboard' },
   { to: '/app/profile', label: 'Profile' },
   { to: '/app/appointments', label: 'Appointments' },
-  { to: '/app/doctors', label: 'Find Doctors' },
 ];
 
 const doctorNav = [
@@ -25,60 +22,39 @@ const adminNav = [
 ];
 
 export default function Layout() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
 
   const nav =
-    user?.role === 'doctor' ? doctorNav
-    : user?.role === 'admin' ? adminNav
-    : patientNav;
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login', { replace: true });
-  };
+    user?.role === 'doctor'
+      ? doctorNav
+      : user?.role === 'admin'
+        ? adminNav
+        : patientNav;
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
-          <Link to="/app" className="text-lg font-bold text-indigo-600">
-            {APP_NAME}
-          </Link>
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <div className="bg-white border-b border-gray-200 px-6 py-3">
+        <div className="max-w-7xl mx-auto flex gap-6 text-sm font-medium">
+          {nav.map((item) => {
+            const isActive = !!useMatch({ path: item.to, end: true });
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`py-2 border-b-2 transition-colors ${
+                  isActive
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-blue-600 hover:border-gray-300'
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </div>
-        <nav className="flex-1 p-4 space-y-1">
-          {nav.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className="block px-3 py-2 rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-700"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-gray-200">
-          <div className="text-sm text-gray-600 mb-2">
-            {user?.firstName} {user?.lastName}
-            <span className="block text-gray-400 capitalize">{user?.role}</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-red-600"
-          >
-            <ArrowRightOnRectangleIcon className="w-5 h-5" />
-            Sign out
-          </button>
-        </div>
-      </aside>
+      </div>
       <main className="flex-1 overflow-auto">
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <h1 className="text-xl font-semibold text-gray-900">
-            {user?.firstName} {user?.lastName}
-          </h1>
-        </header>
-        <div className="p-6">
+        <div className="max-w-7xl mx-auto px-6 py-6">
           <Outlet />
         </div>
       </main>

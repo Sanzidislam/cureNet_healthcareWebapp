@@ -7,8 +7,9 @@ import { useAuth } from '../context/AuthContext';
 import type { RegisterData } from '../context/AuthContext';
 import { MEDICAL_DEPARTMENTS } from '../utils/departments';
 import { APP_NAME } from '../utils/constants';
+import { validatePassword } from '../utils/passwordValidation';
 
-type Role = 'patient' | 'doctor' | 'admin';
+type Role = 'patient' | 'doctor';
 
 interface RegisterForm extends RegisterData {
   confirmPassword: string;
@@ -55,12 +56,12 @@ export default function Register() {
             ← Back to Home
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Create your account</h1>
-          <p className="text-gray-600 mb-6">Join {APP_NAME} as a patient, doctor, or admin.</p>
+          <p className="text-gray-600 mb-6">Join {APP_NAME} as a patient or doctor.</p>
 
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">I am a</label>
             <div className="flex gap-4">
-              {(['patient', 'doctor', 'admin'] as const).map((r) => (
+              {(['patient', 'doctor'] as const).map((r) => (
                 <label key={r} className="flex items-center">
                   <input
                     type="radio"
@@ -121,7 +122,7 @@ export default function Register() {
                 className="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 {...registerField('password', {
                   required: 'Password is required',
-                  minLength: { value: 6, message: 'At least 6 characters' },
+                  validate: (v) => validatePassword(v ?? ''),
                 })}
               />
               <button

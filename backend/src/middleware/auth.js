@@ -28,6 +28,8 @@ export const authenticateToken = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Account is deactivated' });
     }
 
+    user.patientId = user.Patient?.id ?? null;
+    user.doctorId = user.Doctor?.id ?? null;
     req.user = user;
     next();
   } catch (err) {

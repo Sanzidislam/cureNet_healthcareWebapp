@@ -44,6 +44,16 @@ export async function register(req, res) {
       });
     }
 
+    // Only patient and doctor can self-register; admin requires separate provisioning
+    if (role === 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin registration is not allowed',
+      });
+    }
+    const allowedRoles = ['patient', 'doctor'];
+    const resolvedRole = allowedRoles.includes(role) ? role : 'patient';
+
     const existing = await User.findOne({ where: { email } });
     if (existing) {
       return res.status(400).json({ success: false, message: 'Email already registered' });
@@ -58,7 +68,7 @@ export async function register(req, res) {
       dateOfBirth: dateOfBirth || null,
       gender: gender || null,
       address: address || null,
-      role: ['patient', 'doctor', 'admin'].includes(role) ? role : 'patient',
+      role: resolvedRole,
     });
 
     if (user.role === 'doctor') {
@@ -95,12 +105,16 @@ export async function register(req, res) {
 export async function login(req, res) {
   try {
     const { email, phone, password } = req.body;
-    const loginKey = email || phone;
-    if (!loginKey || !password) {
+    const emailVal = typeof email === 'string' ? email.trim() : '';
+    const phoneVal = typeof phone === 'string' ? phone.trim() : '';
+    if (!password) {
       return res.status(400).json({ success: false, message: 'Email or phone and password required' });
     }
+    if (!emailVal && !phoneVal) {
+      return res.status(400).json({ success: false, message: 'Email or phone is required' });
+    }
 
-    const where = email ? { email } : { phone };
+    const where = emailVal ? { email: emailVal } : { phone: phoneVal };
     const user = await User.findOne({
       where,
       include: [
@@ -190,11 +204,10 @@ export async function forgotPassword(req, res) {
     await PasswordResetToken.create({ userId: user.id, token, expiresAt });
 
     // TODO: send email with reset link (e.g. FRONTEND_URL/reset-password?token=...)
-    // For Phase 1 we just return success; frontend can show "check your email"
+    // Never expose the reset token in the API response; send it only via email.
     return res.json({
       success: true,
       message: 'If that email exists, we sent a reset link',
-      data: process.env.NODE_ENV === 'development' ? { token } : undefined,
     });
   } catch (err) {
     console.error('Forgot password error:', err);
