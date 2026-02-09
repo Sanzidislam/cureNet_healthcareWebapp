@@ -1,8 +1,18 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/curenet_logo.png';
 
+const navLinks = [
+  { to: '/', label: 'HOME' },
+  { to: '/app/doctors', label: 'ALL DOCTORS' },
+  { to: '/about', label: 'ABOUT' },
+  { to: '/contact', label: 'CONTACT US' },
+];
+
 const Navbar = () => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -19,43 +29,39 @@ const Navbar = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+    setMobileMenuOpen(false);
   };
 
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
   return (
-    <nav className="bg-white shadow-sm font-sans">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-        <Link to="/" className="flex items-center gap-2">
-          <img src={logo} className="w-44 cursor-pointer" alt="CureNET" />
+    <nav className="bg-white shadow-sm font-sans w-full">
+      <div className="w-full px-4 sm:px-6 md:px-10 py-4 flex justify-between items-center">
+        <Link to="/" className="flex items-center gap-2 shrink-0" onClick={closeMobileMenu}>
+          <img src={logo} className="w-32 md:w-44 cursor-pointer" alt="CureNET" />
         </Link>
 
-        <div className="hidden md:flex gap-8 text-sm font-medium text-gray-600 items-center">
-          <Link to="/" className="hover:text-blue-600">
-            HOME
-          </Link>
-          <Link to="/app/doctors" className="hover:text-blue-600">
-            ALL DOCTORS
-          </Link>
-          <Link to="/about" className="hover:text-blue-600">
-            ABOUT
-          </Link>
-          <Link to="/contact" className="hover:text-blue-600">
-            CONTACT US
-          </Link>
+        {/* Desktop nav */}
+        <div className="hidden md:flex gap-6 lg:gap-8 text-sm font-medium text-gray-600 items-center">
+          {navLinks.map(({ to, label }) => (
+            <Link key={to} to={to} className="hover:text-blue-600 whitespace-nowrap">
+              {label}
+            </Link>
+          ))}
         </div>
 
-        <div className="flex gap-4 items-center">
+        {/* Desktop auth */}
+        <div className="hidden md:flex gap-4 items-center shrink-0">
           {user ? (
             <>
-              <div className="flex items-center gap-3">
-                <Link
-                  to={dashboardPath}
-                  className="text-gray-800 font-bold hover:text-blue-600"
-                >
-                  {displayName}
-                </Link>
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold border border-blue-200">
-                  {initial}
-                </div>
+              <Link
+                to={dashboardPath}
+                className="text-gray-800 font-bold hover:text-blue-600 truncate max-w-[120px] lg:max-w-none"
+              >
+                {displayName}
+              </Link>
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold border border-blue-200 shrink-0">
+                {initial}
               </div>
               <button
                 onClick={handleLogout}
@@ -71,14 +77,81 @@ const Navbar = () => {
               </Link>
               <Link
                 to="/login"
-                className="bg-blue-600 text-white px-6 py-2 rounded-full font-medium hover:bg-blue-700"
+                className="bg-blue-600 text-white px-4 lg:px-6 py-2 rounded-full font-medium hover:bg-blue-700"
               >
-                Log in
+                Login
               </Link>
             </>
           )}
         </div>
+
+        {/* Mobile menu button */}
+        <button
+          type="button"
+          className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100"
+          onClick={() => setMobileMenuOpen((o) => !o)}
+          aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+        >
+          {mobileMenuOpen ? <XMarkIcon className="w-6 h-6" /> : <Bars3Icon className="w-6 h-6" />}
+        </button>
       </div>
+
+      {/* Mobile menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-gray-200 bg-white w-full">
+          <div className="w-full px-4 sm:px-6 md:px-10 py-4 flex flex-col gap-4">
+            {navLinks.map(({ to, label }) => (
+              <Link
+                key={to}
+                to={to}
+                className="text-sm font-medium text-gray-600 hover:text-blue-600 py-2"
+                onClick={closeMobileMenu}
+              >
+                {label}
+              </Link>
+            ))}
+            <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
+              {user ? (
+                <>
+                  <Link
+                    to={dashboardPath}
+                    className="text-gray-800 font-bold hover:text-blue-600 py-2 flex items-center gap-2"
+                    onClick={closeMobileMenu}
+                  >
+                    <span className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">
+                      {initial}
+                    </span>
+                    {displayName}
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="text-red-500 text-sm font-medium hover:underline text-left py-2"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/register"
+                    className="text-blue-600 font-medium py-2"
+                    onClick={closeMobileMenu}
+                  >
+                    Sign up
+                  </Link>
+                  <Link
+                    to="/login"
+                    className="bg-blue-600 text-white text-center py-2.5 px-4 rounded-full font-medium"
+                    onClick={closeMobileMenu}
+                  >
+                    Login
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

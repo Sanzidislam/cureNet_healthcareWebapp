@@ -18,7 +18,8 @@ npm run dev
 ```
 
 - **API:** `http://localhost:5000` · Health: `GET /api/health`
-- **Migrations:** Schema is applied automatically on startup. To run migrations only (e.g. in CI): `npm run migrate`. Migration files: `src/migrations/*.mjs` (add new ones with a timestamp prefix and `up`/`down` exports).
+- **Migrations:** Schema is applied automatically on startup. To run migrations only (e.g. in CI): `npm run migrate`. Migration files: `src/migrations/*.mjs` (add new ones with a timestamp prefix and `up`/`down` exports).  
+  **Windows / "migrations up to date" but tables missing:** If `npm run migrate` says "up to date" but you get errors like "table X doesn't exist", the migration runner may have found no files (e.g. due to path/glob on Windows). After pulling the latest code (which fixes the glob), run migrations again. If the app still thinks migrations ran, reset and re-run: in MySQL run `DELETE FROM SequelizeMeta;` (or `DROP TABLE SequelizeMeta;`) in your database, then run `npm run migrate` again from the `backend` folder.
 
 **Auth** (`/api/auth`): `POST /register`, `POST /login`, `GET`/`PUT /profile`, `POST /forgot-password`, `GET /verify-reset-token?token=...`, `POST /reset-password`.
 
