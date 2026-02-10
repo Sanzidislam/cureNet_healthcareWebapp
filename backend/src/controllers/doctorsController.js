@@ -22,7 +22,7 @@ function formatDoctorResponse(doctor, user) {
 export async function list(req, res) {
   try {
     const { department, limit } = req.query;
-    const where = {};
+    const where = { verified: true };
     if (department) where.department = department;
     const options = {
       where,

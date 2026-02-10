@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import db from '../models/index.js';
 import PasswordResetToken from '../models/PasswordResetToken.js';
+import { logAudit } from '../lib/auditLog.js';
 
 const { User, Doctor, Patient } = db;
 
@@ -129,6 +130,9 @@ export async function login(req, res) {
     if (!user.isActive) {
       return res.status(403).json({ success: false, message: 'Account is deactivated' });
     }
+
+    const ip = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null;
+    logAudit({ action: 'user_login', userId: user.id, entityType: 'user', entityId: user.id, details: { email: user.email }, ip }).catch(() => {});
 
     const token = signToken(user.id);
     return res.json({

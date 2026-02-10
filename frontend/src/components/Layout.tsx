@@ -20,6 +20,8 @@ const adminNav = [
   { to: '/app/users', label: 'Users' },
   { to: '/app/admin-doctors', label: 'Doctors' },
   { to: '/app/admin-patients', label: 'Patients' },
+  { to: '/app/admin-analytics', label: 'Analytics' },
+  { to: '/app/admin-logs', label: 'Logs' },
 ];
 
 export default function Layout() {

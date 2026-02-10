@@ -37,6 +37,11 @@ const Doctor = sequelize.define(
     consultationFee: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
     bio: { type: DataTypes.TEXT, allowNull: true },
     profileImage: { type: DataTypes.STRING(500), allowNull: true },
+    verified: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
     chamberTimes: {
       type: DataTypes.JSON,
       allowNull: true,

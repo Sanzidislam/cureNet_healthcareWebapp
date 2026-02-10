@@ -1,7 +1,12 @@
 import db from '../models/index.js';
 import { Op } from 'sequelize';
+import { logAudit } from '../lib/auditLog.js';
 
 const { Appointment, Doctor, Patient, User } = db;
+
+function getClientIp(req) {
+  return req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null;
+}
 
 const WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
@@ -52,6 +57,14 @@ export async function create(req, res) {
       symptoms: symptoms || null,
       status: 'requested',
     });
+    logAudit({
+      action: 'appointment_created',
+      userId: user.id,
+      entityType: 'appointment',
+      entityId: String(appointment.id),
+      details: { appointmentId: appointment.id, doctorId: docId, appointmentDate, timeBlock, status: 'requested' },
+      ip: getClientIp(req),
+    }).catch(() => {});
     const withAssocs = await Appointment.findByPk(appointment.id, {
       include: [
         { model: Doctor, as: 'Doctor', include: [{ model: User, as: 'User', attributes: ['id', 'firstName', 'lastName'] }] },
@@ -197,7 +210,16 @@ export async function approve(req, res) {
     if (appointment.status !== 'requested') {
       return res.status(400).json({ success: false, message: 'Only requested appointments can be approved' });
     }
+    const oldStatus = appointment.status;
     await appointment.update({ status: 'approved' });
+    logAudit({
+      action: 'appointment_status_updated',
+      userId: user.id,
+      entityType: 'appointment',
+      entityId: String(appointment.id),
+      details: { appointmentId: appointment.id, oldStatus, newStatus: 'approved' },
+      ip: getClientIp(req),
+    }).catch(() => {});
     return res.json({ success: true, data: { appointment: formatAppointment(appointment) } });
   } catch (err) {
     console.error('Approve appointment error:', err);
@@ -220,7 +242,16 @@ export async function reject(req, res) {
     if (appointment.status !== 'requested') {
       return res.status(400).json({ success: false, message: 'Only requested appointments can be rejected' });
     }
+    const oldStatus = appointment.status;
     await appointment.update({ status: 'rejected' });
+    logAudit({
+      action: 'appointment_status_updated',
+      userId: user.id,
+      entityType: 'appointment',
+      entityId: String(appointment.id),
+      details: { appointmentId: appointment.id, oldStatus, newStatus: 'rejected' },
+      ip: getClientIp(req),
+    }).catch(() => {});
     return res.json({ success: true, data: { appointment: formatAppointment(appointment) } });
   } catch (err) {
     console.error('Reject appointment error:', err);
@@ -243,7 +274,16 @@ export async function start(req, res) {
     if (appointment.status !== 'approved') {
       return res.status(400).json({ success: false, message: 'Only approved appointments can be started' });
     }
+    const oldStatus = appointment.status;
     await appointment.update({ status: 'in_progress' });
+    logAudit({
+      action: 'appointment_status_updated',
+      userId: user.id,
+      entityType: 'appointment',
+      entityId: String(appointment.id),
+      details: { appointmentId: appointment.id, oldStatus, newStatus: 'in_progress' },
+      ip: getClientIp(req),
+    }).catch(() => {});
     return res.json({ success: true, data: { appointment: formatAppointment(appointment) } });
   } catch (err) {
     console.error('Start appointment error:', err);
@@ -266,7 +306,16 @@ export async function complete(req, res) {
     if (appointment.status !== 'in_progress') {
       return res.status(400).json({ success: false, message: 'Only in-progress appointments can be completed' });
     }
+    const oldStatus = appointment.status;
     await appointment.update({ status: 'completed' });
+    logAudit({
+      action: 'appointment_status_updated',
+      userId: user.id,
+      entityType: 'appointment',
+      entityId: String(appointment.id),
+      details: { appointmentId: appointment.id, oldStatus, newStatus: 'completed' },
+      ip: getClientIp(req),
+    }).catch(() => {});
     return res.json({ success: true, data: { appointment: formatAppointment(appointment) } });
   } catch (err) {
     console.error('Complete appointment error:', err);
@@ -288,7 +337,16 @@ export async function cancel(req, res) {
     if (['cancelled', 'rejected', 'completed'].includes(appointment.status)) {
       return res.status(400).json({ success: false, message: 'Appointment cannot be cancelled' });
     }
+    const oldStatus = appointment.status;
     await appointment.update({ status: 'cancelled' });
+    logAudit({
+      action: 'appointment_status_updated',
+      userId: user.id,
+      entityType: 'appointment',
+      entityId: String(appointment.id),
+      details: { appointmentId: appointment.id, oldStatus, newStatus: 'cancelled' },
+      ip: getClientIp(req),
+    }).catch(() => {});
     return res.json({ success: true, data: { appointment: formatAppointment(appointment) } });
   } catch (err) {
     console.error('Cancel appointment error:', err);
