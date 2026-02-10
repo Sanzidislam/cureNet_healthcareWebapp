@@ -95,9 +95,10 @@ export default function Doctors() {
               ? (doc.profileImage.startsWith('http') ? doc.profileImage : `${API_BASE}${doc.profileImage}`)
               : null;
             return (
-              <div
+              <Link
                 key={doc.id}
-                className="rounded-3xl bg-white border-2 border-sky-200 overflow-hidden flex flex-col hover:border-[#3990D7]/50 transition-colors"
+                to={`/doctors/${doc.id}`}
+                className="rounded-3xl bg-white border-2 border-sky-200 overflow-hidden flex flex-col hover:border-[#3990D7]/50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#3990D7] focus:ring-offset-2"
               >
                 <div className="relative h-56 sm:h-60 bg-sky-50/80 flex items-center justify-center overflow-hidden rounded-t-[22px]">
                   {imgSrc ? (
@@ -124,25 +125,27 @@ export default function Doctors() {
                       ? `★ ${rating.averageRating.toFixed(1)} (${rating.totalRatings})`
                       : 'No ratings yet'}
                   </p>
-                  <div className="mt-auto pt-4">
+                  <div className="mt-auto pt-4" onClick={(e) => e.preventDefault()}>
                     {isPatient ? (
                       <Link
                         to={`/app/appointments?book=${doc.id}`}
                         className="block w-full text-center rounded-full bg-[#3990D7] py-3 px-4 text-sm font-medium text-white hover:bg-[#2d7ab8] transition-colors cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         Book Now
                       </Link>
                     ) : (
                       <Link
-                        to="/login?redirect=/app/doctors"
+                        to="/login?redirect=/doctors"
                         className="block w-full text-center rounded-full border-2 border-[#3990D7] py-3 px-4 text-sm font-medium text-[#3990D7] hover:bg-[#EAEFFF] transition-colors cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         Sign in to book
                       </Link>
                     )}
                   </div>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

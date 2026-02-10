@@ -28,6 +28,7 @@ import DoctorProfile from './pages/DoctorProfile';
 import Appointments from './pages/Appointments';
 import DoctorAppointments from './pages/DoctorAppointments';
 import Doctors from './pages/Doctors';
+import DoctorProfileView from './pages/DoctorProfileView';
 import AppPlaceholder from './pages/AppPlaceholder';
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/doctors" element={<Doctors />} />
+            <Route path="/doctors/:id" element={<DoctorProfileView />} />
             <Route
               path="/app"
               element={

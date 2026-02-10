@@ -33,7 +33,9 @@ router.post('/upload-image', authenticateToken, authorizeRoles('doctor'), upload
 
 router.get('/', doctorsController.list);
 router.get('/:id/available-slots', doctorsController.getAvailableSlots);
+router.get('/:id/upcoming-slots', doctorsController.getUpcomingSlots);
 router.get('/:id/ratings', doctorsController.getRatings);
+router.get('/:id', doctorsController.getPublicProfile);
 
 router.get('/:id/dashboard/stats', authenticateToken, authorizeRoles('doctor'), doctorsController.getDashboardStats);
 router.get('/:id/appointments', authenticateToken, authorizeRoles('doctor'), doctorsController.getAppointments);

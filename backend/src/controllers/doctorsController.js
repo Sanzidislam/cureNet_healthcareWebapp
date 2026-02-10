@@ -234,6 +234,84 @@ export async function getAvailableSlots(req, res) {
   }
 }
 
+export async function getPublicProfile(req, res) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid doctor id' });
+    }
+    const doctor = await Doctor.findByPk(id, {
+      include: [{ model: User, as: 'User', attributes: { exclude: ['password'] } }],
+    });
+    if (!doctor || !doctor.verified) {
+      return res.status(404).json({ success: false, message: 'Doctor not found' });
+    }
+    const patientCount = await Appointment.count({
+      where: { doctorId: id },
+      distinct: true,
+      col: 'patientId',
+    });
+    const doctorJson = formatDoctorResponse(doctor, doctor.User);
+    return res.json({
+      success: true,
+      data: {
+        doctor: { ...doctorJson, patientCount },
+      },
+    });
+  } catch (err) {
+    console.error('Get public doctor profile error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Failed' });
+  }
+}
+
+export async function getUpcomingSlots(req, res) {
+  try {
+    const doctorId = parseInt(req.params.id, 10);
+    const days = Math.min(30, Math.max(1, parseInt(req.query.days, 10) || 14));
+    const doctor = await Doctor.findByPk(doctorId);
+    if (!doctor) {
+      return res.status(404).json({ success: false, message: 'Doctor not found' });
+    }
+    if (!doctor.verified) {
+      return res.status(404).json({ success: false, message: 'Doctor not found' });
+    }
+    const chamberTimes = doctor.chamberTimes || {};
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const slots = [];
+    const today = new Date();
+    for (let i = 0; i < days; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const weekday = dayNames[d.getDay()];
+      const timeBlocks = Array.isArray(chamberTimes[weekday]) ? chamberTimes[weekday] : [];
+      if (timeBlocks.length === 0) continue;
+      const booked = await Appointment.findAll({
+        where: {
+          doctorId,
+          appointmentDate: dateStr,
+          status: { [Op.notIn]: ['cancelled', 'rejected'] },
+        },
+        attributes: ['timeBlock'],
+      });
+      const bookedSet = new Set(booked.map((a) => a.timeBlock));
+      const minTime = timeBlocks[0];
+      const maxTime = timeBlocks[timeBlocks.length - 1];
+      slots.push({
+        date: dateStr,
+        dayName: weekday.charAt(0).toUpperCase() + weekday.slice(1),
+        timeRange: `${minTime} - ${maxTime}`,
+        timeBlocks,
+        booked: timeBlocks.map((t) => ({ timeBlock: t, booked: bookedSet.has(t) })),
+      });
+    }
+    return res.json({ success: true, data: { slots } });
+  } catch (err) {
+    console.error('Get upcoming slots error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Failed' });
+  }
+}
+
 export async function getRatings(req, res) {
   try {
     const doctorId = req.params.id;
