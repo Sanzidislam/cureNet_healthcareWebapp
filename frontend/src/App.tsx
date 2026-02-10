@@ -43,6 +43,7 @@ export default function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/doctors" element={<Doctors />} />
             <Route
               path="/app"
               element={
@@ -59,7 +60,7 @@ export default function App() {
               <Route path="doctor-profile" element={<ProtectedRoute requiredRole="doctor"><DoctorProfile /></ProtectedRoute>} />
               <Route path="appointments" element={<ProtectedRoute requiredRole="patient"><Appointments /></ProtectedRoute>} />
               <Route path="doctor-appointments" element={<ProtectedRoute requiredRole="doctor"><DoctorAppointments /></ProtectedRoute>} />
-              <Route path="doctors" element={<ProtectedRoute requiredRole="patient"><Doctors /></ProtectedRoute>} />
+              <Route path="doctors" element={<Doctors />} />
               <Route path="patients" element={<AppPlaceholder />} />
               <Route path="users" element={<AppPlaceholder />} />
               <Route path="admin-doctors" element={<AppPlaceholder />} />

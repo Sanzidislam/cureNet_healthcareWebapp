@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   UserGroupIcon,
   BeakerIcon,
@@ -8,6 +9,7 @@ import {
   HeartIcon,
   AcademicCapIcon,
 } from '@heroicons/react/24/outline';
+import { api } from '../context/AuthContext';
 
 const HERO_IMAGE = 'https://storage.googleapis.com/tagjs-prod.appspot.com/v1/v0o8XbXdnI/0ngpry2q_expires_30_days.png';
 const FEATURE_LEFT = 'https://storage.googleapis.com/tagjs-prod.appspot.com/v1/v0o8XbXdnI/z3yn2juq_expires_30_days.png';
@@ -29,15 +31,47 @@ const SPECIALTIES = [
   { name: 'General', icon: AcademicCapIcon },
 ];
 
-const TOP_DOCTORS = [
-  { name: 'Dr. Richard James', specialty: 'General physician', available: true },
-  { name: 'Dr. Richard James', specialty: 'General physician', available: true },
-  { name: 'Dr. Richard James', specialty: 'General physician', available: false },
-  { name: 'Dr. Richard James', specialty: 'General physician', available: true },
-  { name: 'Dr. Richard James', specialty: 'General physician', available: true },
-];
+const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'http://localhost:5000';
+
+interface DoctorItem {
+  id: number;
+  department?: string;
+  consultationFee?: number;
+  profileImage?: string;
+  user?: { firstName: string; lastName: string };
+}
 
 export default function LandingPage() {
+  const { data: doctors = [], isLoading: loadingDoctors } = useQuery({
+    queryKey: ['doctors', 'landing', 5],
+    queryFn: async () => {
+      const { data: res } = await api.get<{ success: boolean; data: { doctors: DoctorItem[] } }>('/doctors', {
+        params: { limit: 5 },
+      });
+      return res.data?.doctors ?? [];
+    },
+  });
+
+  const { data: ratingsMap = {} } = useQuery({
+    queryKey: ['ratings', doctors.map((d) => d.id)],
+    queryFn: async () => {
+      const out: Record<number, { averageRating: number; totalRatings: number }> = {};
+      await Promise.all(
+        doctors.map(async (d) => {
+          try {
+            const { data: r } = await api.get<{ success: boolean; data: { summary: { averageRating: number; totalRatings: number } } }>(
+              `/ratings/doctor/${d.id}`
+            );
+            out[d.id] = r.data?.summary ?? { averageRating: 0, totalRatings: 0 };
+          } catch {
+            out[d.id] = { averageRating: 0, totalRatings: 0 };
+          }
+        })
+      );
+      return out;
+    },
+    enabled: doctors.length > 0,
+  });
   return (
     <div className="flex flex-col bg-white min-h-screen">
       {/* ================= HERO ================= */}
@@ -109,7 +143,7 @@ export default function LandingPage() {
           ))}
         </div>
         <Link
-          to="/app/doctors"
+          to="/doctors"
           className="bg-[#EAEFFF] text-gray-700 text-xl font-medium py-[17px] px-[84px] rounded-[50px] hover:bg-[#d5dcff] transition-colors"
         >
           more
@@ -124,29 +158,46 @@ export default function LandingPage() {
         <p className="text-[#495565] text-xl md:text-[27px] mb-8 text-center ">
           Simply browse through our extensive list of trusted doctors.
         </p>
-        <div className="flex  justify-center gap-6 mb-8 max-w-6xl">
-          {TOP_DOCTORS.map((doctor, i) => (
-            <div
-              key={i}
-              className="flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden w-[200px] md:w-[220px] shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="h-48 bg-gray-100 flex items-center justify-center">
-                <UserGroupIcon className="w-16 h-16 text-gray-400" />
-              </div>
-              <div className="p-4">
-                {doctor.available && (
-                  <span className="inline-block text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded mb-2">
-                    Available
-                  </span>
-                )}
-                <h3 className="font-bold text-gray-900">{doctor.name}</h3>
-                <p className="text-sm text-gray-600">{doctor.specialty}</p>
-              </div>
-            </div>
-          ))}
+        <div className="flex flex-wrap justify-center gap-6 mb-8 max-w-6xl">
+          {loadingDoctors ? (
+            <p className="text-gray-500">Loading doctors...</p>
+          ) : doctors.length === 0 ? (
+            <p className="text-gray-500">No doctors listed yet.</p>
+          ) : (
+            doctors.map((doc) => {
+              const name = doc.user ? `Dr. ${doc.user.firstName} ${doc.user.lastName}` : 'Doctor';
+              const rating = ratingsMap[doc.id] ?? { averageRating: 0, totalRatings: 0 };
+              const imgSrc = doc.profileImage
+                ? (doc.profileImage.startsWith('http') ? doc.profileImage : `${API_BASE}${doc.profileImage}`)
+                : null;
+              return (
+                <div
+                  key={doc.id}
+                  className="flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden w-[200px] md:w-[220px] shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
+                    {imgSrc ? (
+                      <img src={imgSrc} alt={name} className="w-full h-full object-cover" />
+                    ) : (
+                      <UserGroupIcon className="w-16 h-16 text-gray-400" />
+                    )}
+                  </div>
+                  <div className="p-4">
+                    {rating.totalRatings > 0 && (
+                      <span className="inline-block text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded mb-2">
+                        ★ {rating.averageRating.toFixed(1)} ({rating.totalRatings})
+                      </span>
+                    )}
+                    <h3 className="font-bold text-gray-900 truncate">{name}</h3>
+                    <p className="text-sm text-gray-600">{doc.department || 'General physician'}</p>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
         <Link
-          to="/app/doctors"
+          to="/doctors"
           className="bg-[#EAEFFF] text-gray-700 text-xl font-medium py-[17px] px-[84px] rounded-[50px] hover:bg-[#d5dcff] transition-colors"
         >
           more

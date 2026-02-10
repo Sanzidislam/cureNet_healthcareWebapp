@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { UserCircleIcon } from '@heroicons/react/24/outline';
-import { api } from '../context/AuthContext';
+import { api, useAuth } from '../context/AuthContext';
 import { MEDICAL_DEPARTMENTS } from '../utils/departments';
+
+const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'http://localhost:5000';
 
 interface DoctorListItem {
   id: number;
@@ -14,6 +16,8 @@ interface DoctorListItem {
 }
 
 export default function Doctors() {
+  const { user } = useAuth();
+  const isPatient = user?.role === 'patient';
   const [department, setDepartment] = useState<string>('');
 
   const { data, isLoading } = useQuery({
@@ -52,14 +56,19 @@ export default function Doctors() {
   const doctors = data ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-2xl font-bold text-gray-900">Find Doctors</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Find Doctors</h2>
+          {!isPatient && (
+            <p className="text-gray-600 mt-1 text-sm">Sign in to book an appointment.</p>
+          )}
+        </div>
         <div className="flex gap-2">
           <select
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-[#3990D7] focus:border-[#3990D7]"
           >
             <option value="">All departments</option>
             {MEDICAL_DEPARTMENTS.map((d) => (
@@ -78,47 +87,60 @@ export default function Doctors() {
           No doctors found.
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {doctors.map((doc) => {
             const rating = ratingsMap?.[doc.id] ?? { averageRating: 0, totalRatings: 0 };
-            const name = doc.user ? `${doc.user.firstName} ${doc.user.lastName}` : 'Doctor';
+            const name = doc.user ? `Dr. ${doc.user.firstName} ${doc.user.lastName}` : 'Doctor';
+            const imgSrc = doc.profileImage
+              ? (doc.profileImage.startsWith('http') ? doc.profileImage : `${API_BASE}${doc.profileImage}`)
+              : null;
             return (
               <div
                 key={doc.id}
-                className="rounded-lg bg-white shadow-sm border border-gray-200 overflow-hidden flex flex-col"
+                className="rounded-3xl bg-white border-2 border-sky-200 overflow-hidden flex flex-col hover:border-[#3990D7]/50 transition-colors"
               >
-                <div className="p-4 flex items-start gap-4">
-                  {doc.profileImage ? (
+                <div className="relative h-56 sm:h-60 bg-sky-50/80 flex items-center justify-center overflow-hidden rounded-t-[22px]">
+                  {imgSrc ? (
                     <img
-                      src={doc.profileImage.startsWith('http') ? doc.profileImage : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${doc.profileImage}`}
+                      src={imgSrc}
                       alt={name}
-                      className="w-16 h-16 rounded-full object-cover"
+                      className="w-full h-full object-cover object-top"
                     />
                   ) : (
-                    <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
-                      <UserCircleIcon className="w-10 h-10 text-gray-400" />
-                    </div>
+                    <UserCircleIcon className="w-20 h-20 text-sky-300" />
                   )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">{name}</h3>
-                    {doc.department && (
-                      <p className="text-sm text-gray-500">{doc.department}</p>
-                    )}
-                    <p className="text-sm text-gray-600 mt-1">
-                      {rating.totalRatings > 0 ? `★ ${rating.averageRating} (${rating.totalRatings})` : 'No ratings yet'}
-                    </p>
-                    {doc.consultationFee != null && (
-                      <p className="text-sm font-medium text-gray-700 mt-1">Fee: ৳{doc.consultationFee}</p>
+                </div>
+                <div className="p-5 flex flex-col flex-1">
+                  <p className="flex items-center gap-1.5 text-sm font-medium text-green-600 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                    Available
+                  </p>
+                  <h3 className="text-xl font-bold text-gray-900 truncate">{name}</h3>
+                  <p className="text-base text-gray-500 mt-0.5">
+                    {doc.department || 'General physician'}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1 min-h-[20px]">
+                    {rating.totalRatings > 0
+                      ? `★ ${rating.averageRating.toFixed(1)} (${rating.totalRatings})`
+                      : 'No ratings yet'}
+                  </p>
+                  <div className="mt-auto pt-4">
+                    {isPatient ? (
+                      <Link
+                        to={`/app/appointments?book=${doc.id}`}
+                        className="block w-full text-center rounded-full bg-[#3990D7] py-3 px-4 text-sm font-medium text-white hover:bg-[#2d7ab8] transition-colors cursor-pointer"
+                      >
+                        Book Now
+                      </Link>
+                    ) : (
+                      <Link
+                        to="/login?redirect=/app/doctors"
+                        className="block w-full text-center rounded-full border-2 border-[#3990D7] py-3 px-4 text-sm font-medium text-[#3990D7] hover:bg-[#EAEFFF] transition-colors cursor-pointer"
+                      >
+                        Sign in to book
+                      </Link>
                     )}
                   </div>
-                </div>
-                <div className="p-4 border-t border-gray-100 mt-auto">
-                  <Link
-                    to={`/app/appointments?book=${doc.id}`}
-                    className="block w-full text-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-                  >
-                    Book appointment
-                  </Link>
                 </div>
               </div>
             );

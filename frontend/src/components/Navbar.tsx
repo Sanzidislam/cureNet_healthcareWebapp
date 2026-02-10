@@ -6,7 +6,7 @@ import logo from '../assets/curenet_logo.png';
 
 const navLinks = [
   { to: '/', label: 'HOME' },
-  { to: '/app/doctors', label: 'ALL DOCTORS' },
+  { to: '/doctors', label: 'ALL DOCTORS' },
   { to: '/about', label: 'ABOUT' },
   { to: '/contact', label: 'CONTACT US' },
 ];

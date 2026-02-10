@@ -21,13 +21,16 @@ function formatDoctorResponse(doctor, user) {
 
 export async function list(req, res) {
   try {
-    const { department } = req.query;
+    const { department, limit } = req.query;
     const where = {};
     if (department) where.department = department;
-    const doctors = await Doctor.findAll({
+    const options = {
       where,
       include: [{ model: User, as: 'User', attributes: { exclude: ['password'] } }],
-    });
+    };
+    const num = parseInt(limit, 10);
+    if (Number.isFinite(num) && num > 0) options.limit = Math.min(num, 100);
+    const doctors = await Doctor.findAll(options);
     const list = doctors.map((d) => formatDoctorResponse(d, d.User));
     return res.json({ success: true, data: { doctors: list } });
   } catch (err) {
