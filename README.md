@@ -17,9 +17,12 @@ npm install
 npm run dev
 ```
 
-- **API:** `http://localhost:5000` · Health: `GET /api/health`
-- **Migrations:** Schema is applied automatically on startup. To run migrations only (e.g. in CI): `npm run migrate`. Migration files: `src/migrations/*.mjs` (add new ones with a timestamp prefix and `up`/`down` exports).  
-  **Windows / "migrations up to date" but tables missing:** If `npm run migrate` says "up to date" but you get errors like "table X doesn't exist", the migration runner may have found no files (e.g. due to path/glob on Windows). After pulling the latest code (which fixes the glob), run migrations again. If the app still thinks migrations ran, reset and re-run: in MySQL run `DELETE FROM SequelizeMeta;` (or `DROP TABLE SequelizeMeta;`) in your database, then run `npm run migrate` again from the `backend` folder.
+- **API:** `http://localhost:5000` · Health: `GET /api/health` · **API docs (Swagger UI):** `http://localhost:5000/docs`
+- **Migrations:** Schema is applied automatically on startup. To run migrations only (e.g. in CI): `npm run migrate`.  
+  Migrations are **one file per table** in `backend/src/migrations/`: `000001-users.mjs`, `000002-doctors.mjs`, … `000008-audit-logs.mjs`. Add new migrations with the next number and table/feature name; each file must export `up` and `down` (receiving `{ context: queryInterface }`).  
+  **Generate from models:** From `backend`, run `npm run generate-migrations` to (over)write migration files from your Sequelize models. Review the diff before committing. Useful when you add or change a model and want matching migration code.  
+  **Existing DB created with old migrations:** If your database was created with the previous timestamp-named migrations, either keep using that DB as-is, or reset and re-run: in MySQL run `DELETE FROM SequelizeMeta;` (or `DROP TABLE SequelizeMeta;`), then drop all app tables if you want a clean slate, then run `npm run migrate` from the `backend` folder.  
+  **"Migrations up to date" but tables missing:** If the runner finds no files (e.g. path/glob on Windows), run migrations again from `backend`. If the app still thinks migrations ran, reset as above and re-run.
 
 **Auth** (`/api/auth`): `POST /register`, `POST /login`, `GET`/`PUT /profile`, `POST /forgot-password`, `GET /verify-reset-token?token=...`, `POST /reset-password`.
 

@@ -4,9 +4,9 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import swaggerUi from 'swagger-ui-express';
 import sequelize from './config/database.js';
 import { runMigrations } from './migrate.js';
-import db from './models/index.js';
 import authRoutes from './routes/auth.js';
 import patientsRoutes from './routes/patients.js';
 import doctorsRoutes from './routes/doctors.js';
@@ -18,6 +18,9 @@ import prescriptionsRoutes from './routes/prescriptions.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+const openApiPath = path.join(__dirname, 'docs', 'openapi.json');
+const openApiSpec = JSON.parse(fs.readFileSync(openApiPath, 'utf8'));
 
 const corsOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
@@ -40,6 +43,11 @@ app.use('/api/prescriptions', prescriptionsRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'CureNet API' });
 });
+
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, {
+  customSiteTitle: 'CureNET API Docs',
+  customCss: '.swagger-ui .topbar { display: none }',
+}));
 
 async function start() {
   try {

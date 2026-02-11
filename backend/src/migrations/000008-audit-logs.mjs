@@ -5,38 +5,39 @@ export async function up({ context: queryInterface }) {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
-      autoIncrement: true,
+      autoIncrement: true
     },
     action: {
       type: DataTypes.STRING(100),
-      allowNull: false,
+      allowNull: false
     },
     user_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
       references: { model: 'users', key: 'id' },
-      onDelete: 'SET NULL',
+      onDelete: 'SET NULL'
     },
     entity_type: {
       type: DataTypes.STRING(50),
-      allowNull: true,
+      allowNull: true
     },
     entity_id: {
       type: DataTypes.STRING(50),
-      allowNull: true,
+      allowNull: true
     },
     details: {
       type: DataTypes.TEXT,
-      allowNull: true,
+      allowNull: true
     },
     ip: {
       type: DataTypes.STRING(45),
-      allowNull: true,
+      allowNull: true
     },
-    created_at: { type: DataTypes.DATE, allowNull: false },
+    created_at: {
+      type: DataTypes.DATE,
+      allowNull: false
+    },
   });
-  await queryInterface.addIndex('audit_logs', ['action']);
-  await queryInterface.addIndex('audit_logs', ['created_at']);
 }
 
 export async function down({ context: queryInterface }) {
