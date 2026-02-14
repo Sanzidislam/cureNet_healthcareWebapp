@@ -17,7 +17,7 @@ npm install
 npm run dev
 ```
 
-- **API:** `http://localhost:5000` · Health: `GET /api/health` · **API docs (Swagger UI):** `http://localhost:5000/docs`
+- **API:** `http://localhost:5000` · Health: `GET /api/health` · **API docs (Swagger UI):** `http://localhost:5000/docs` · **Admin panel (AdminJS):** `http://localhost:5000/admin` — backend-only; log in with an admin user (create one via `npm run create-admin`). Optional `.env`: `ADMIN_SESSION_SECRET`. If you change custom AdminJS components (e.g. dashboard), remove `backend/.adminjs/` and restart the server so the bundle rebuilds.
 - **Migrations:** Schema is applied automatically on startup. To run migrations only (e.g. in CI): `npm run migrate`.  
   Migrations are **one file per table** in `backend/src/migrations/`: `000001-users.mjs`, `000002-doctors.mjs`, … `000008-audit-logs.mjs`. Add new migrations with the next number and table/feature name; each file must export `up` and `down` (receiving `{ context: queryInterface }`).  
   **Generate from models:** From `backend`, run `npm run generate-migrations` to (over)write migration files from your Sequelize models. Review the diff before committing. Useful when you add or change a model and want matching migration code.  

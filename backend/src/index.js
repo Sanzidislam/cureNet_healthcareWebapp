@@ -14,6 +14,7 @@ import adminRoutes from './routes/admin.js';
 import ratingsRoutes from './routes/ratings.js';
 import appointmentsRoutes from './routes/appointments.js';
 import prescriptionsRoutes from './routes/prescriptions.js';
+import { buildAdminRouter } from './adminjs.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -49,6 +50,18 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
 }));
 
+// Simple login: hide AdminJS left panel and center the form
+app.get('/admin-simple.css', (_req, res) => {
+  res.type('text/css').send(`
+.login__Wrapper > div > div:first-child { display: none !important; }
+.login__Wrapper > div { width: 100% !important; max-width: 380px; }
+.login__Wrapper .login__Wrapper { min-height: 100vh; }
+  `.trim());
+});
+
+const { admin, router: adminRouter } = buildAdminRouter();
+app.use(admin.options.rootPath, adminRouter);
+
 async function start() {
   try {
     await sequelize.authenticate();
@@ -61,6 +74,7 @@ async function start() {
 
   app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`Admin panel: http://localhost:${PORT}/admin`);
   });
 }
 
