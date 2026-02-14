@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "migrate": "node -e \"import('./src/migrate.js').then(m=>m.runMigrations()).then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1);})\"",
-    "generate-migrations": "node scripts/generate-migrations-from-models.mjs"
+    "generate-migrations": "node scripts/generate-migrations-from-models.mjs",
+    "create-admin": "node scripts/create-admin.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

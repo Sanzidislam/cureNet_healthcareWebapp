@@ -24,7 +24,8 @@ npm run dev
   **Existing DB created with old migrations:** If your database was created with the previous timestamp-named migrations, either keep using that DB as-is, or reset and re-run: in MySQL run `DELETE FROM SequelizeMeta;` (or `DROP TABLE SequelizeMeta;`), then drop all app tables if you want a clean slate, then run `npm run migrate` from the `backend` folder.  
   **"Migrations up to date" but tables missing:** If the runner finds no files (e.g. path/glob on Windows), run migrations again from `backend`. If the app still thinks migrations ran, reset as above and re-run.
 
-**Auth** (`/api/auth`): `POST /register`, `POST /login`, `GET`/`PUT /profile`, `POST /forgot-password`, `GET /verify-reset-token?token=...`, `POST /reset-password`.
+**Auth** (`/api/auth`): `POST /register`, `POST /login`, `GET`/`PUT /profile`, `POST /forgot-password`, `GET /verify-reset-token?token=...`, `POST /reset-password`.  
+- **First admin:** Admins cannot self-register. Create one with `npm run create-admin` (uses `ADMIN_EMAIL`, `ADMIN_PASSWORD` from `.env`, or pass as args). Password is hashed via Sequelize. If you added an admin in MySQL with a plain password, run `node scripts/update-admin-password.mjs <email> <newPassword>` to fix it.
 
 **Patients** (`/api/patients`): `GET`/`PUT /profile`, `GET /:id/dashboard/stats`, `GET /:id/appointments`.
 
