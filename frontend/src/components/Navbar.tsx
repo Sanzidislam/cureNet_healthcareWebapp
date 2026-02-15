@@ -35,7 +35,7 @@ const Navbar = () => {
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
   return (
-    <nav className="bg-white shadow-sm font-sans w-full">
+    <nav className="sticky top-0 z-50 bg-white shadow-sm font-sans w-full">
       <div className="w-full px-4 sm:px-6 md:px-10 py-4 flex justify-between items-center">
         <Link to="/" className="flex items-center gap-2 shrink-0" onClick={closeMobileMenu}>
           <img src={logo} className="w-32 md:w-44 cursor-pointer" alt="CureNET" />

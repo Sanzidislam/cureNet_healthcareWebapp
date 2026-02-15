@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../context/AuthContext';
 import {
   UserGroupIcon,
   BeakerIcon,
@@ -42,6 +43,7 @@ interface DoctorItem {
 }
 
 export default function LandingPage() {
+  const { user } = useAuth();
   const { data: doctors = [], isLoading: loadingDoctors } = useQuery({
     queryKey: ['doctors', 'landing', 5],
     queryFn: async () => {
@@ -86,10 +88,10 @@ export default function LandingPage() {
               schedule your appointment hassle-free.
             </p>
             <Link
-              to="/register"
+              to={user ? (user.role === 'patient' ? '/app/dashboard' : user.role === 'doctor' ? '/app/doctor-dashboard' : '/app/admin-dashboard') : '/register'}
               className="inline-flex justify-center bg-[#3990D7] text-white text-lg font-bold py-2.5 px-8 rounded-[47px] hover:bg-[#2d7ab8] transition-colors"
             >
-              Explore now
+              {user ? 'Go to Dashboard' : 'Explore now'}
             </Link>
           </div>
           <img
@@ -209,12 +211,21 @@ export default function LandingPage() {
         <h2 className="text-white text-3xl md:text-[52px] font-bold text-center px-4">
           Book Appointment With 100+ Trusted Doctors
         </h2>
-        <Link
-          to="/register"
-          className="bg-white text-gray-700 text-xl font-medium py-[17px] px-10 rounded-[50px] hover:bg-gray-100 transition-colors"
-        >
-          Create account
-        </Link>
+        {user ? (
+          <Link
+            to={user.role === 'patient' ? '/app/dashboard' : user.role === 'doctor' ? '/app/doctor-dashboard' : '/app/admin-dashboard'}
+            className="bg-white text-gray-700 text-xl font-medium py-[17px] px-10 rounded-[50px] hover:bg-gray-100 transition-colors"
+          >
+            Go to Dashboard
+          </Link>
+        ) : (
+          <Link
+            to="/register"
+            className="bg-white text-gray-700 text-xl font-medium py-[17px] px-10 rounded-[50px] hover:bg-gray-100 transition-colors"
+          >
+            Create account
+          </Link>
+        )}
       </section>
     </div>
   );

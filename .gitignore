@@ -38,3 +38,4 @@ coverage/
 /*.md
 #keep the readme
 !/README.md
+/backend/uploads/
