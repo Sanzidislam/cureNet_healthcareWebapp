@@ -352,10 +352,70 @@ export default function DoctorProfile() {
       <div className="rounded-lg bg-white shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-200">
           <h3 className="font-semibold text-gray-900">Lists (degrees, awards, languages, services)</h3>
-          <p className="text-sm text-gray-500 mt-1">Edit in a future iteration or add simple text fields if needed.</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Add items as simple lists (press Enter to add each one). These are shown on your public profile.
+          </p>
         </div>
-        <div className="p-4 text-gray-500 text-sm">
-          Degrees, awards, languages and services can be added as list fields in a follow-up. Profile save already supports them as arrays.
+        <div className="p-4 space-y-4">
+          {(['degrees', 'awards', 'languages', 'services'] as const).map((fieldKey) => {
+            const label =
+              fieldKey === 'degrees'
+                ? 'Degrees'
+                : fieldKey === 'awards'
+                  ? 'Awards'
+                  : fieldKey === 'languages'
+                    ? 'Languages'
+                    : 'Services';
+            const items = form.watch(fieldKey) ?? [];
+            return (
+              <div key={fieldKey}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {items.length === 0 && (
+                    <span className="text-xs text-gray-400 italic">No {label.toLowerCase()} added yet.</span>
+                  )}
+                  {items.map((val, idx) => (
+                    <span
+                      key={`${val}-${idx}`}
+                      className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-800"
+                    >
+                      {val}
+                      {editing && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = items.filter((_, i) => i !== idx);
+                            form.setValue(fieldKey, next, { shouldDirty: true });
+                          }}
+                          className="ml-1 text-gray-400 hover:text-red-500"
+                          aria-label={`Remove ${label} item`}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+                {editing && (
+                  <input
+                    type="text"
+                    placeholder={`Add ${label.toLowerCase().slice(0, -1)} and press Enter`}
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white"
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter') return;
+                      e.preventDefault();
+                      const value = (e.currentTarget.value || '').trim();
+                      if (!value) return;
+                      if (!items.includes(value)) {
+                        form.setValue(fieldKey, [...items, value], { shouldDirty: true });
+                      }
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
