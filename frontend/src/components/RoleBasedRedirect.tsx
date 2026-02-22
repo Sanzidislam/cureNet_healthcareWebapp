@@ -18,12 +18,12 @@ export default function RoleBasedRedirect() {
 
   switch (user.role) {
     case 'patient':
-      return <Navigate to="/app/dashboard" replace />;
+      return <Navigate to="/app/patient-dashboard" replace />;
     case 'doctor':
       return <Navigate to="/app/doctor-dashboard" replace />;
     case 'admin':
       return <Navigate to="/app/admin-dashboard" replace />;
     default:
-      return <Navigate to="/app/dashboard" replace />;
+      return <Navigate to="/app/patient-dashboard" replace />;
   }
 }

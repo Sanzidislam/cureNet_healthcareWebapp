@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { UserCircleIcon } from '@heroicons/react/24/outline';
 import { StarIcon, CalendarDaysIcon } from '@heroicons/react/24/solid';
 
@@ -22,12 +22,22 @@ export default function DoctorCard({
     totalRatings = 0,
     isPatient = false,
 }: DoctorCardProps) {
+    const navigate = useNavigate();
+
     return (
-        <Link
-            to={`/doctors/${id}`}
+        <div
+            onClick={() => navigate(`/doctors/${id}`)}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(`/doctors/${id}`);
+                }
+            }}
+            tabIndex={0}
+            role="button"
             className="group relative bg-white rounded-2xl overflow-hidden flex flex-col shadow-md
                  border border-slate-200/80 hover:shadow-xl hover:-translate-y-1
-                 transition-all duration-300 ease-out focus:outline-none
+                 transition-all duration-300 ease-out focus:outline-none cursor-pointer
                  focus:ring-2 focus:ring-[#3990D7] focus:ring-offset-2"
         >
             {/* ── Image / avatar area with gradient backdrop ── */}
@@ -87,7 +97,7 @@ export default function DoctorCard({
                 )}
 
                 {/* CTA button */}
-                <div className="mt-auto pt-3" onClick={(e) => e.preventDefault()}>
+                <div className="mt-auto pt-3" onClick={(e) => e.stopPropagation()}>
                     {isPatient ? (
                         <Link
                             to={`/app/appointments?book=${id}`}
@@ -114,6 +124,6 @@ export default function DoctorCard({
                     )}
                 </div>
             </div>
-        </Link>
+        </div>
     );
 }

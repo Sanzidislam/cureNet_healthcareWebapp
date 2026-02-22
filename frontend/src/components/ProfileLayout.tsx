@@ -2,17 +2,17 @@ import { Link, Outlet, useMatch } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const patientNav = [
-  { to: '/app/dashboard', label: 'Dashboard' },
-  { to: '/app/profile', label: 'Profile' },
-  { to: '/app/appointments', label: 'Appointments' },
-  { to: '/app/doctors', label: 'Find doctors' },
+  { to: '/app/patient-dashboard', label: 'Dashboard' },
+  { to: '/app/patient-profile', label: 'Profile' },
+  { to: '/app/patient-appointments', label: 'Appointments' },
+  // { to: '/app/doctors', label: 'Find doctors' },
 ];
 
 const doctorNav = [
   { to: '/app/doctor-dashboard', label: 'Dashboard' },
   { to: '/app/doctor-profile', label: 'Profile' },
   { to: '/app/doctor-appointments', label: 'Appointments' },
-  { to: '/app/patients', label: 'Patients' },
+  // { to: '/app/patients', label: 'Patients' },
 ];
 
 const adminNav = [
@@ -24,7 +24,7 @@ const adminNav = [
   { to: '/app/admin-logs', label: 'Logs' },
 ];
 
-export default function Layout() {
+export default function ProfileLayout() {
   const { user } = useAuth();
 
   const nav =
