@@ -70,3 +70,31 @@ export async function create(req, res) {
     return res.status(500).json({ success: false, message: err.message || 'Failed' });
   }
 }
+
+export async function editPrescription(req, res) {
+  try {
+    const user = req.user;
+    if (user.role !== 'doctor' || !user.doctorId) {
+      return res.status(403).json({ success: false, message: 'Not a doctor' });
+    }
+    const prescriptionId = parseInt(req.params.id, 10);
+    const { diagnosis, medicines, notes } = req.body;
+    const prescription = await Prescription.findByPk(prescriptionId, {
+      include: [{ model: Appointment, as: 'Appointment' }],
+    });
+    if (!prescription) {
+      return res.status(404).json({ success: false, message: 'Prescription not found' });
+    }
+    if (prescription.Appointment.doctorId !== user.doctorId) {
+      return res.status(403).json({ success: false, message: 'Not your prescription' });
+    }
+    await prescription.update({ diagnosis, medicines, notes });
+    return res.json({
+      success: true,
+      data: { prescription: prescription.get({ plain: true }) },
+    });
+  } catch (err) {
+    console.error('Edit prescription error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Failed' });
+  }
+}

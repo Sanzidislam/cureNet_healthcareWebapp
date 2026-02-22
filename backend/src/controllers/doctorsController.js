@@ -73,7 +73,7 @@ export async function updateProfile(req, res) {
     }
     const allowed = [
       'bmdcRegistrationNumber', 'department', 'experience', 'education', 'certifications',
-      'hospital', 'location', 'consultationFee', 'bio', 'chamberTimes', 'degrees', 'awards',
+      'hospital', 'location', 'consultationFee', 'bio', 'chamberTimes', 'chamberWindows', 'degrees', 'awards',
       'languages', 'services',
     ];
     const updates = {};
@@ -187,6 +187,8 @@ export async function getAppointments(req, res) {
         type: d.type,
         reason: d.reason,
         symptoms: d.symptoms,
+        window: d.window,
+        serial: d.serial,
         status: d.status,
         createdAt: d.createdAt,
         patient: d.Patient ? { id: d.Patient.id, user: d.Patient.User } : null,
@@ -214,20 +216,54 @@ export async function getAvailableSlots(req, res) {
     if (!doctor) {
       return res.status(404).json({ success: false, message: 'Doctor not found' });
     }
-    const chamberTimes = doctor.chamberTimes || {};
     const weekday = getWeekday(date);
-    const daySlots = Array.isArray(chamberTimes[weekday]) ? chamberTimes[weekday] : [];
+    const chamberWindows = doctor.chamberWindows || {};
+    const dayWindows = chamberWindows[weekday] || {};
+    
+    const windows = [
+      { key: 'morning', label: 'Morning (09:00–13:00)', timeRange: '09:00–13:00' },
+      { key: 'noon', label: 'Noon (13:00–17:00)', timeRange: '13:00–17:00' },
+      { key: 'evening', label: 'Evening (17:00–18:00)', timeRange: '17:00–18:00' },
+    ];
+    
     const booked = await Appointment.findAll({
       where: {
         doctorId,
         appointmentDate: date,
         status: { [Op.notIn]: ['cancelled', 'rejected'] },
       },
-      attributes: ['timeBlock'],
+      attributes: ['window', 'serial'],
     });
-    const bookedSet = new Set(booked.map((a) => a.timeBlock));
-    const slots = daySlots.filter((t) => !bookedSet.has(t));
-    return res.json({ success: true, data: { slots } });
+    
+    const bookedByWindow = {};
+    for (const apt of booked) {
+      const win = apt.window;
+      if (win) {
+        if (!bookedByWindow[win]) bookedByWindow[win] = [];
+        bookedByWindow[win].push(apt.serial || 0);
+      }
+    }
+    
+    const available = windows.map((w) => {
+      const config = dayWindows[w.key] || {};
+      const enabled = config.enabled === true;
+      const maxPatients = config.maxPatients || 0;
+      const bookedCount = (bookedByWindow[w.key] || []).length;
+      const spotsLeft = enabled && maxPatients > 0 ? Math.max(0, maxPatients - bookedCount) : (enabled ? 999 : 0);
+      
+      return {
+        window: w.key,
+        label: w.label,
+        timeRange: w.timeRange,
+        enabled,
+        maxPatients: maxPatients || null,
+        booked: bookedCount,
+        spotsLeft,
+        available: enabled && (maxPatients === 0 || spotsLeft > 0),
+      };
+    });
+    
+    return res.json({ success: true, data: { windows: available } });
   } catch (err) {
     console.error('Get available slots error:', err);
     return res.status(500).json({ success: false, message: err.message || 'Failed' });

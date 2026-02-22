@@ -60,7 +60,7 @@ export default function DoctorProfileView() {
   const isPatient = user?.role === 'patient';
 
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTimeBlock, setSelectedTimeBlock] = useState('');
+  const [selectedWindow, setSelectedWindow] = useState('');
   const [reason, setReason] = useState('');
   const [symptoms, setSymptoms] = useState('');
 
@@ -73,25 +73,25 @@ export default function DoctorProfileView() {
     enabled: !!id,
   });
 
-  const { data: availableSlots = [], isLoading: slotsLoading } = useQuery({
+  const { data: availableWindows = [], isLoading: windowsLoading } = useQuery({
     queryKey: ['available-slots', id, selectedDate],
     queryFn: async () => {
-      const { data } = await api.get<{ success: boolean; data: { slots: string[] } }>(
+      const { data } = await api.get<{ success: boolean; data: { windows: Array<{ window: string; label: string; timeRange: string; enabled: boolean; maxPatients: number | null; booked: number; spotsLeft: number; available: boolean }> } }>(
         `/doctors/${id}/available-slots`,
         { params: { date: selectedDate } }
       );
-      return data.data?.slots ?? [];
+      return data.data?.windows ?? [];
     },
     enabled: !!id && !!selectedDate,
   });
 
   const bookMutation = useMutation({
-    mutationFn: (body: { doctorId: number; appointmentDate: string; timeBlock: string; type: string; reason?: string; symptoms?: string }) =>
+    mutationFn: (body: { doctorId: number; appointmentDate: string; window: string; type: string; reason?: string; symptoms?: string }) =>
       api.post('/appointments', body),
     onSuccess: () => {
       toast.success('Appointment requested');
       setSelectedDate('');
-      setSelectedTimeBlock('');
+      setSelectedWindow('');
       setReason('');
       setSymptoms('');
       queryClient.invalidateQueries({ queryKey: ['available-slots', id] });
@@ -302,7 +302,7 @@ export default function DoctorProfileView() {
                         value={selectedDate}
                         onChange={(e) => {
                           setSelectedDate(e.target.value);
-                          setSelectedTimeBlock('');
+                          setSelectedWindow('');
                         }}
                         className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-[#3990D7] focus:border-[#3990D7]"
                       />
@@ -310,29 +310,40 @@ export default function DoctorProfileView() {
 
                     {selectedDate && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Available slots</label>
-                        {slotsLoading ? (
-                          <p className="text-sm text-gray-500">Loading slots...</p>
-                        ) : availableSlots.length === 0 ? (
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Available windows</label>
+                        {windowsLoading ? (
+                          <p className="text-sm text-gray-500">Loading windows...</p>
+                        ) : availableWindows.length === 0 || availableWindows.every((w) => !w.available) ? (
                           <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-                            No available slot for this date. Try another.
+                            No available window for this date. Try another.
                           </p>
                         ) : (
-                          <div className="flex flex-wrap gap-2">
-                            {availableSlots.map((slot) => (
-                              <button
-                                key={slot}
-                                type="button"
-                                onClick={() => setSelectedTimeBlock(slot)}
-                                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                                  selectedTimeBlock === slot
-                                    ? 'border-[#3990D7] bg-[#3990D7] text-white'
-                                    : 'border-gray-300 bg-white text-gray-700 hover:border-[#3990D7] hover:bg-sky-50'
-                                }`}
-                              >
-                                {formatTime(slot)}
-                              </button>
-                            ))}
+                          <div className="space-y-2">
+                            {availableWindows.map((w) => {
+                              if (!w.available) return null;
+                              return (
+                                <button
+                                  key={w.window}
+                                  type="button"
+                                  onClick={() => setSelectedWindow(w.window)}
+                                  className={`w-full rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors text-left ${
+                                    selectedWindow === w.window
+                                      ? 'border-[#3990D7] bg-[#3990D7] text-white'
+                                      : 'border-gray-300 bg-white text-gray-700 hover:border-[#3990D7] hover:bg-sky-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-semibold">{w.label}</span>
+                                    <span className="text-xs opacity-75">{w.timeRange}</span>
+                                  </div>
+                                  {w.maxPatients != null && w.maxPatients > 0 && (
+                                    <div className="text-xs mt-1 opacity-75">
+                                      {w.spotsLeft > 0 ? `${w.spotsLeft} spot${w.spotsLeft > 1 ? 's' : ''} left` : 'Full'}
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -361,13 +372,13 @@ export default function DoctorProfileView() {
 
                     <button
                       type="button"
-                      disabled={!selectedDate || !selectedTimeBlock || bookMutation.isPending}
+                      disabled={!selectedDate || !selectedWindow || bookMutation.isPending}
                       onClick={() => {
-                        if (!id || !selectedDate || !selectedTimeBlock) return;
+                        if (!id || !selectedDate || !selectedWindow) return;
                         bookMutation.mutate({
                           doctorId: parseInt(id, 10),
                           appointmentDate: selectedDate,
-                          timeBlock: selectedTimeBlock,
+                          window: selectedWindow,
                           type: 'in_person',
                           reason: reason || undefined,
                           symptoms: symptoms || undefined,

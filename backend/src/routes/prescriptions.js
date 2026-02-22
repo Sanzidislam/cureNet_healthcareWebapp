@@ -8,5 +8,5 @@ router.use(authenticateToken);
 
 router.get('/appointment/:id', prescriptionsController.getByAppointment);
 router.post('/', authorizeRoles('doctor'), prescriptionsController.create);
-
+router.put('/:id', authorizeRoles('doctor'), prescriptionsController.editPrescription);
 export default router;

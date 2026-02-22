@@ -45,7 +45,12 @@ const Doctor = sequelize.define(
     chamberTimes: {
       type: DataTypes.JSON,
       allowNull: true,
-      comment: 'Explicit slot list per day: { monday: ["09:00", "09:30"], ... }',
+      comment: 'DEPRECATED: Use chamberWindows instead. Explicit slot list per day: { monday: ["09:00", "09:30"], ... }',
+    },
+    chamberWindows: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'Window-based availability: { monday: { morning: { enabled: true, maxPatients: 10 }, noon: { enabled: false, maxPatients: 0 }, evening: { enabled: true, maxPatients: 8 } }, ... }',
     },
     degrees: { type: DataTypes.JSON, allowNull: true },
     awards: { type: DataTypes.JSON, allowNull: true },

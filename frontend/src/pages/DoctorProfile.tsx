@@ -4,18 +4,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { api } from '../context/AuthContext';
 import { MEDICAL_DEPARTMENTS } from '../utils/departments';
-import {
-  CHAMBER_TIME_SLOTS,
-  WEEKDAYS,
-  emptyChamberTimes,
-  normalizeChamberTimes,
-  type ChamberTimes,
-  type Weekday,
-} from '../utils/timeSlots';
+import { WEEKDAYS } from '../utils/timeSlots';
 
 const API_ORIGIN = import.meta.env.VITE_API_URL
   ? new URL(import.meta.env.VITE_API_URL).origin
   : 'http://localhost:5000';
+
+interface ChamberWindowConfig {
+  enabled: boolean;
+  maxPatients?: number;
+}
+
+type ChamberWindows = Partial<Record<typeof WEEKDAYS[number], Partial<Record<'morning' | 'noon' | 'evening', ChamberWindowConfig>>>>;
 
 interface DoctorForm {
   bmdcRegistrationNumber?: string;
@@ -28,17 +28,56 @@ interface DoctorForm {
   consultationFee?: number;
   bio?: string;
   profileImage?: string;
-  chamberTimes?: ChamberTimes;
+  chamberWindows?: ChamberWindows;
   degrees?: string[];
   awards?: string[];
   languages?: string[];
   services?: string[];
 }
 
+const WINDOWS = [
+  { key: 'morning' as const, label: 'Morning', timeRange: '09:00–13:00' },
+  { key: 'noon' as const, label: 'Noon', timeRange: '13:00–17:00' },
+  { key: 'evening' as const, label: 'Evening', timeRange: '17:00–18:00' },
+] as const;
+
+function emptyChamberWindows(): ChamberWindows {
+  const out: ChamberWindows = {};
+  for (const day of WEEKDAYS) {
+    out[day] = {
+      morning: { enabled: false, maxPatients: 0 },
+      noon: { enabled: false, maxPatients: 0 },
+      evening: { enabled: false, maxPatients: 0 },
+    };
+  }
+  return out;
+}
+
+function normalizeChamberWindows(raw: ChamberWindows | null | undefined): ChamberWindows {
+  const out = emptyChamberWindows();
+  if (!raw || typeof raw !== 'object') return out;
+  for (const day of WEEKDAYS) {
+    const dayData = raw[day];
+    if (dayData && typeof dayData === 'object') {
+      for (const win of WINDOWS) {
+        const winData = dayData[win.key];
+        if (winData && typeof winData === 'object') {
+          out[day] = out[day] || {};
+          out[day]![win.key] = {
+            enabled: winData.enabled === true,
+            maxPatients: typeof winData.maxPatients === 'number' ? winData.maxPatients : 0,
+          };
+        }
+      }
+    }
+  }
+  return out;
+}
+
 export default function DoctorProfile() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
-  const [chamberTimes, setChamberTimes] = useState<ChamberTimes>(emptyChamberTimes());
+  const [chamberWindows, setChamberWindows] = useState<ChamberWindows>(emptyChamberWindows());
   const [uploading, setUploading] = useState(false);
 
   const { data: profileData } = useQuery({
@@ -86,13 +125,13 @@ export default function DoctorProfile() {
         languages: Array.isArray(doctor.languages) ? doctor.languages : [],
         services: Array.isArray(doctor.services) ? doctor.services : [],
       });
-      setChamberTimes(normalizeChamberTimes(doctor.chamberTimes));
+      setChamberWindows(normalizeChamberWindows(doctor.chamberWindows));
     }
   }, [doctor]);
 
   const updateMutation = useMutation({
     mutationFn: async (payload: DoctorForm) => {
-      await api.put('/doctors/profile', { ...payload, chamberTimes });
+      await api.put('/doctors/profile', { ...payload, chamberWindows });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctors', 'profile'] });
@@ -103,15 +142,6 @@ export default function DoctorProfile() {
       toast.error(err.response?.data?.message ?? 'Update failed');
     },
   });
-
-  const handleSlotToggle = (day: Weekday, time: string) => {
-    if (!editing) return;
-    setChamberTimes((prev) => {
-      const arr = prev[day] ?? [];
-      const next = arr.includes(time) ? arr.filter((t) => t !== time) : [...arr, time].sort();
-      return { ...prev, [day]: next };
-    });
-  };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -162,7 +192,7 @@ export default function DoctorProfile() {
             </button>
             <button
               type="button"
-              onClick={form.handleSubmit((d) => updateMutation.mutate({ ...d, chamberTimes }))}
+              onClick={form.handleSubmit((d) => updateMutation.mutate({ ...d, chamberWindows }))}
               disabled={updateMutation.isPending}
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
             >
@@ -297,55 +327,75 @@ export default function DoctorProfile() {
 
       <div className="rounded-lg bg-white shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-200">
-          <h3 className="font-semibold text-gray-900">Chamber times (availability)</h3>
-          <p className="text-sm text-gray-500 mt-1">Select the time slots when you are available each day (30-min slots).</p>
+          <h3 className="font-semibold text-gray-900">Chamber availability (by window)</h3>
+          <p className="text-sm text-gray-500 mt-1">
+            Choose which parts of the day you see patients on each weekday. Set max patients per window (0 = unlimited).
+          </p>
         </div>
-        <div className="p-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-2 pr-4 font-medium text-gray-700">Day</th>
-                <th className="text-left py-2 font-medium text-gray-700">Time slots</th>
-              </tr>
-            </thead>
-            <tbody>
-              {WEEKDAYS.map((day) => (
-                <tr key={day} className="border-b border-gray-100">
-                  <td className="py-2 pr-4 capitalize text-gray-700">{day}</td>
-                  <td className="py-2">
-                    <div className="flex flex-wrap gap-1">
-                      {CHAMBER_TIME_SLOTS.map((time) => {
-                        const selected = (chamberTimes[day] ?? []).includes(time);
-                        return (
-                          <label
-                            key={time}
-                            className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium cursor-pointer ${
-                              editing
-                                ? selected
-                                  ? 'bg-indigo-100 text-indigo-800'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                : selected
-                                  ? 'bg-indigo-50 text-indigo-700'
-                                  : 'text-gray-400'
-                            }`}
-                          >
+        <div className="p-4 space-y-4">
+          {WEEKDAYS.map((day) => {
+            const dayWindows = chamberWindows[day] || {};
+            return (
+              <div key={day} className="border-b border-gray-100 pb-4 last:border-b-0 last:pb-0">
+                <div className="capitalize text-sm font-medium text-gray-800 mb-3">{day}</div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {WINDOWS.map((w) => {
+                    const config = dayWindows[w.key] || { enabled: false, maxPatients: 0 };
+                    const enabled = config.enabled === true;
+                    const maxPatients = config.maxPatients || 0;
+                    return (
+                      <div key={w.key} className="flex flex-col gap-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={enabled}
+                            disabled={!editing}
+                            onChange={(e) => {
+                              if (!editing) return;
+                              setChamberWindows((prev) => {
+                                const next = { ...prev };
+                                if (!next[day]) next[day] = {};
+                                next[day] = { ...next[day], [w.key]: { enabled: e.target.checked, maxPatients } };
+                                return next;
+                              });
+                            }}
+                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="text-sm font-medium text-gray-700">{w.label}</span>
+                          <span className="text-xs text-gray-500">({w.timeRange})</span>
+                        </label>
+                        {enabled && editing && (
+                          <div className="flex items-center gap-2 ml-6">
+                            <label className="text-xs text-gray-600">Max patients:</label>
                             <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() => handleSlotToggle(day, time)}
-                              disabled={!editing}
-                              className="sr-only"
+                              type="number"
+                              min={0}
+                              value={maxPatients}
+                              onChange={(e) => {
+                                const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                setChamberWindows((prev) => {
+                                  const next = { ...prev };
+                                  if (!next[day]) next[day] = {};
+                                  next[day] = { ...next[day], [w.key]: { enabled: true, maxPatients: val } };
+                                  return next;
+                                });
+                              }}
+                              className="w-20 rounded border border-gray-300 px-2 py-1 text-xs"
+                              placeholder="0"
                             />
-                            {time}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                            {maxPatients === 0 && <span className="text-xs text-gray-500">(unlimited)</span>}
+                          </div>
+                        )}
+                        {enabled && !editing && maxPatients > 0 && (
+                          <div className="ml-6 text-xs text-gray-600">Max: {maxPatients}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

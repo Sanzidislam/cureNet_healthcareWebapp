@@ -32,8 +32,18 @@ const Appointment = sequelize.define(
     },
     timeBlock: {
       type: DataTypes.STRING(10),
-      allowNull: false,
-      comment: 'Slot string e.g. 09:00',
+      allowNull: true,
+      comment: 'DEPRECATED: Use window+serial instead. Slot string e.g. 09:00',
+    },
+    window: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      comment: 'Window name: morning, noon, or evening',
+    },
+    serial: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'Serial number within the window (1, 2, 3, ...)',
     },
     type: {
       type: DataTypes.ENUM(...typeEnum),
