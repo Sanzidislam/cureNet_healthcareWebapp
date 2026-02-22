@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import {
-  UserGroupIcon,
   BeakerIcon,
   CircleStackIcon,
   UserIcon,
@@ -11,6 +10,7 @@ import {
   AcademicCapIcon,
 } from '@heroicons/react/24/outline';
 import { api } from '../context/AuthContext';
+import DoctorCard from '../components/DoctorCard';
 
 const HERO_IMAGE = 'https://storage.googleapis.com/tagjs-prod.appspot.com/v1/v0o8XbXdnI/0ngpry2q_expires_30_days.png';
 const FEATURE_LEFT = 'https://storage.googleapis.com/tagjs-prod.appspot.com/v1/v0o8XbXdnI/z3yn2juq_expires_30_days.png';
@@ -154,55 +154,54 @@ export default function LandingPage() {
 
       {/* ================= TOP DOCTORS TO BOOK ================= */}
       <section className="flex flex-col items-center py-8 mb-16 px-4">
-        <h2 className="text-[#2196F3] text-3xl md:text-[44px] font-bold text-center mb-2">
-          Top Doctors to Book
-        </h2>
-        <p className="text-[#495565] text-xl md:text-[27px] mb-8 text-center ">
-          Simply browse through our extensive list of trusted doctors.
-        </p>
-        <div className="flex flex-wrap justify-center gap-6 mb-8 max-w-6xl">
-          {loadingDoctors ? (
-            <p className="text-gray-500">Loading doctors...</p>
-          ) : doctors.length === 0 ? (
-            <p className="text-gray-500">No doctors listed yet.</p>
-          ) : (
-            doctors.map((doc) => {
+        {/* Section header */}
+        <div className="text-center mb-10">
+          <span className="text-xs font-semibold tracking-widest text-[#3990D7] uppercase">Our Specialists</span>
+          <h2 className="text-3xl md:text-[42px] font-bold text-gray-900 mt-1">
+            Top Doctors to Book
+          </h2>
+          <p className="text-gray-500 text-base md:text-lg mt-2 max-w-md mx-auto">
+            Simply browse through our extensive list of trusted doctors.
+          </p>
+        </div>
+
+        {loadingDoctors ? (
+          <p className="text-gray-500">Loading doctors...</p>
+        ) : doctors.length === 0 ? (
+          <p className="text-gray-500">No doctors listed yet.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 w-full max-w-6xl mb-10">
+            {doctors.map((doc) => {
               const name = doc.user ? `Dr. ${doc.user.firstName} ${doc.user.lastName}` : 'Doctor';
               const rating = ratingsMap[doc.id] ?? { averageRating: 0, totalRatings: 0 };
               const imgSrc = doc.profileImage
                 ? (doc.profileImage.startsWith('http') ? doc.profileImage : `${API_BASE}${doc.profileImage}`)
                 : null;
               return (
-                <div
+                <DoctorCard
                   key={doc.id}
-                  className="flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden w-[200px] md:w-[220px] shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <div className="h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
-                    {imgSrc ? (
-                      <img src={imgSrc} alt={name} className="w-full h-full object-cover" />
-                    ) : (
-                      <UserGroupIcon className="w-16 h-16 text-gray-400" />
-                    )}
-                  </div>
-                  <div className="p-4">
-                    {rating.totalRatings > 0 && (
-                      <span className="inline-block text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded mb-2">
-                        ★ {rating.averageRating.toFixed(1)} ({rating.totalRatings})
-                      </span>
-                    )}
-                    <h3 className="font-bold text-gray-900 truncate">{name}</h3>
-                    <p className="text-sm text-gray-600">{doc.department || 'General physician'}</p>
-                  </div>
-                </div>
+                  id={doc.id}
+                  name={name}
+                  department={doc.department}
+                  imgSrc={imgSrc}
+                  averageRating={rating.averageRating}
+                  totalRatings={rating.totalRatings}
+                  consultationFee={doc.consultationFee}
+                  isPatient={false}
+                />
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
+
         <Link
           to="/doctors"
-          className="bg-[#EAEFFF] text-gray-700 text-xl font-medium py-[17px] px-[84px] rounded-[50px] hover:bg-[#d5dcff] transition-colors"
+          className="inline-flex items-center gap-2 bg-gradient-to-r from-[#3990D7] to-indigo-500
+                     text-white font-semibold py-3 px-10 rounded-full shadow-md
+                     hover:from-[#2d7ab8] hover:to-indigo-600 hover:shadow-lg
+                     transition-all duration-200"
         >
-          more
+          Browse all doctors
         </Link>
       </section>
 

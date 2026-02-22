@@ -8,7 +8,7 @@ import type { RegisterData } from '../context/AuthContext';
 import { MEDICAL_DEPARTMENTS } from '../utils/departments';
 import { APP_NAME } from '../utils/constants';
 import { validatePassword } from '../utils/passwordValidation';
-
+import registerPageImage from '../assets/register_page_image.png';
 type Role = 'patient' | 'doctor';
 
 interface RegisterForm extends RegisterData {
@@ -48,209 +48,247 @@ export default function Register() {
     }
   };
 
-  return (
-    <div className="min-h-screen flex">
-      <div className="flex-1 flex items-center justify-center px-4 py-12 bg-gray-50 overflow-auto">
-        <div className="w-full max-w-md my-8">
-          <Link to="/" className="text-sm text-indigo-600 hover:text-indigo-500 mb-6 inline-block">
-            ← Back to Home
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Create your account</h1>
-          <p className="text-gray-600 mb-6">Join {APP_NAME} as a patient or doctor.</p>
+  const inputCls =
+    'w-full px-8 py-4 rounded-lg font-medium bg-gray-100 border border-gray-200 placeholder-gray-500 text-sm focus:outline-none focus:border-gray-400 focus:bg-white';
 
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">I am a</label>
-            <div className="flex gap-4">
-              {(['patient', 'doctor'] as const).map((r) => (
-                <label key={r} className="flex items-center">
-                  <input
-                    type="radio"
-                    name="role"
-                    checked={role === r}
-                    onChange={() => setRole(r)}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span className="ml-2 text-sm capitalize">{r}</span>
-                </label>
-              ))}
-            </div>
+  const inputSmCls =
+    'w-full px-4 py-3 rounded-lg font-medium bg-gray-100 border border-gray-200 placeholder-gray-500 text-sm focus:outline-none focus:border-gray-400 focus:bg-white';
+
+  return (
+    <div className="min-h-screen bg-gray-100 text-gray-900 flex justify-center items-center py-8 px-4">
+      <div className="max-w-4xl w-full bg-white shadow-lg sm:rounded-lg flex justify-center" style={{ minHeight: '560px' }}>
+
+        {/* ── Form panel ── */}
+        <div className="lg:w-1/2 xl:w-5/12 p-6 sm:p-10 overflow-y-auto">
+          {/* App name */}
+          <div className="text-center">
+            <span className="text-2xl font-extrabold text-indigo-600">{APP_NAME}</span>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">First name</label>
-                <input
-                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                  {...registerField('firstName', { required: 'Required' })}
-                />
-                {errors.firstName && (
-                  <p className="mt-1 text-sm text-red-600">{errors.firstName.message}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Last name</label>
-                <input
-                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                  {...registerField('lastName', { required: 'Required' })}
-                />
-                {errors.lastName && (
-                  <p className="mt-1 text-sm text-red-600">{errors.lastName.message}</p>
-                )}
-              </div>
-            </div>
+          <div className="mt-10 flex flex-col items-center">
+            <h1 className="text-2xl xl:text-3xl font-extrabold">Create Account</h1>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
-                autoComplete="email"
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                {...registerField('email', {
-                  required: 'Email is required',
-                  pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Invalid email' },
-                })}
-              />
-              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
-            </div>
-
-            <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                {...registerField('password', {
-                  required: 'Password is required',
-                  validate: (v) => validatePassword(v ?? ''),
-                })}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                className="absolute right-2 top-8 text-gray-500 hover:text-gray-700"
-              >
-                {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-              </button>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
-              <input
-                type="password"
-                autoComplete="new-password"
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                {...registerField('confirmPassword', {
-                  required: 'Please confirm password',
-                  validate: (v) => v === password || 'Passwords do not match',
-                })}
-              />
-              {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-              <input
-                type="tel"
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                {...registerField('phone')}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date of birth</label>
-                <input
-                  type="date"
-                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                  {...registerField('dateOfBirth')}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-                <select
-                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                  {...registerField('gender')}
-                >
-                  <option value="">Select</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-              <input
-                type="text"
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                {...registerField('address')}
-              />
-            </div>
-
-            {role === 'doctor' && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">BMDC Registration Number</label>
-                  <input
-                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                    {...registerField('bmdcRegistrationNumber')}
-                  />
+            <div className="w-full flex-1 mt-6">
+              {/* Role selector */}
+              <div className="mx-auto max-w-xs mb-6">
+                <p className="text-sm font-medium text-gray-700 mb-2">I am a:</p>
+                <div className="flex gap-4">
+                  {(['patient', 'doctor'] as const).map((r) => (
+                    <label
+                      key={r}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border cursor-pointer text-sm font-medium transition-all duration-200 ${role === r
+                        ? 'bg-indigo-500 text-white border-indigo-500'
+                        : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-indigo-300'
+                        }`}
+                    >
+                      <input
+                        type="radio"
+                        name="role"
+                        checked={role === r}
+                        onChange={() => setRole(r)}
+                        className="hidden"
+                      />
+                      <span className="capitalize">{r}</span>
+                    </label>
+                  ))}
                 </div>
+              </div>
+
+              {/* Divider */}
+              <div className="my-4 border-b text-center">
+                <div className="leading-none px-2 inline-block text-sm text-gray-600 tracking-wide font-medium bg-white transform translate-y-1/2">
+                  Fill in your details
+                </div>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleSubmit(onSubmit)} className="mx-auto max-w-xs space-y-3 mt-6">
+
+                {/* First & Last name */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <input
+                      placeholder="First name"
+                      className={inputSmCls}
+                      {...registerField('firstName', { required: 'Required' })}
+                    />
+                    {errors.firstName && (
+                      <p className="mt-1 text-xs text-red-600">{errors.firstName.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      placeholder="Last name"
+                      className={inputSmCls}
+                      {...registerField('lastName', { required: 'Required' })}
+                    />
+                    {errors.lastName && (
+                      <p className="mt-1 text-xs text-red-600">{errors.lastName.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                  <select
-                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                    {...registerField('department')}
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    placeholder="Email"
+                    className={inputCls}
+                    {...registerField('email', {
+                      required: 'Email is required',
+                      pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Invalid email' },
+                    })}
+                  />
+                  {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
+                </div>
+
+                {/* Password */}
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder="Password"
+                    className={`${inputCls} pr-12`}
+                    {...registerField('password', {
+                      required: 'Password is required',
+                      validate: (v) => validatePassword(v ?? ''),
+                    })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                   >
-                    <option value="">Select department</option>
-                    {MEDICAL_DEPARTMENTS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
+                    {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                  </button>
+                  {errors.password && (
+                    <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
+                  )}
                 </div>
+
+                {/* Confirm password */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Years of experience</label>
                   <input
-                    type="number"
-                    min={0}
-                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                    {...registerField('experience', { valueAsNumber: true })}
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="Confirm password"
+                    className={inputCls}
+                    {...registerField('confirmPassword', {
+                      required: 'Please confirm password',
+                      validate: (v) => v === password || 'Passwords do not match',
+                    })}
+                  />
+                  {errors.confirmPassword && (
+                    <p className="mt-1 text-xs text-red-600">{errors.confirmPassword.message}</p>
+                  )}
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <input
+                    type="tel"
+                    placeholder="Phone (optional)"
+                    className={inputCls}
+                    {...registerField('phone')}
                   />
                 </div>
-              </>
-            )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              {loading ? 'Creating account...' : 'Create account'}
-            </button>
-          </form>
+                {/* DOB & Gender */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <input
+                      type="date"
+                      className={inputSmCls}
+                      {...registerField('dateOfBirth')}
+                    />
+                  </div>
+                  <div>
+                    <select className={inputSmCls} {...registerField('gender')}>
+                      <option value="">Gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                </div>
 
-          <p className="mt-6 text-center text-sm text-gray-600">
-            Already have an account?{' '}
-            <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
-              Sign in
-            </Link>
-          </p>
+                {/* Address */}
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Address (optional)"
+                    className={inputCls}
+                    {...registerField('address')}
+                  />
+                </div>
+
+                {/* Doctor-specific fields */}
+                {role === 'doctor' && (
+                  <>
+                    <div>
+                      <input
+                        placeholder="BMDC Registration Number"
+                        className={inputCls}
+                        {...registerField('bmdcRegistrationNumber')}
+                      />
+                    </div>
+                    <div>
+                      <select className={inputCls} {...registerField('department')}>
+                        <option value="">Select department</option>
+                        {MEDICAL_DEPARTMENTS.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder="Years of experience"
+                        className={inputCls}
+                        {...registerField('experience', { valueAsNumber: true })}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Submit */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="mt-2 tracking-wide font-semibold bg-indigo-500 text-gray-100 w-full py-4 rounded-lg hover:bg-indigo-700 transition-all duration-300 ease-in-out flex items-center justify-center focus:shadow-outline focus:outline-none disabled:opacity-50"
+                >
+                  <svg className="w-6 h-6 -ml-2" fill="none" stroke="currentColor" strokeWidth="2"
+                    strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                    <circle cx="8.5" cy="7" r="4" />
+                    <path d="M20 8v6M23 11h-6" />
+                  </svg>
+                  <span className="ml-3">{loading ? 'Creating account…' : 'Create Account'}</span>
+                </button>
+
+                <p className="mt-4 text-xs text-gray-600 text-center">
+                  Already have an account?{' '}
+                  <Link to="/login" className="border-b border-gray-500 border-dotted font-medium">
+                    Sign in
+                  </Link>
+                </p>
+              </form>
+            </div>
+          </div>
         </div>
-      </div>
-      <div className="hidden lg:block flex-1 bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-600 p-12 flex flex-col justify-center text-white">
-        <h2 className="text-2xl font-bold mb-4">Why join {APP_NAME}?</h2>
-        <ul className="space-y-3 text-indigo-100">
-          <li>• Connect with patients and manage appointments</li>
-          <li>• Build your professional profile and reputation</li>
-          <li>• Secure, compliant healthcare platform</li>
-        </ul>
+
+        {/* ── Illustration panel ── */}
+        <div className="flex-1 bg-indigo-100 text-center hidden lg:flex">
+          <div
+            className="m-12 xl:m-16 w-full bg-contain bg-center bg-no-repeat"
+            style={{
+              backgroundImage: `url(${registerPageImage})`,
+            }}
+          />
+        </div>
+
       </div>
     </div>
   );

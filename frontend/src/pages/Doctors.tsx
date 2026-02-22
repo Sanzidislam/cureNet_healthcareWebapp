@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { UserCircleIcon } from '@heroicons/react/24/outline';
 import { api, useAuth } from '../context/AuthContext';
 import { MEDICAL_DEPARTMENTS } from '../utils/departments';
+import DoctorCard from '../components/DoctorCard';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'http://localhost:5000';
 
@@ -39,9 +38,10 @@ export default function Doctors() {
       await Promise.all(
         data.map(async (d) => {
           try {
-            const { data: r } = await api.get<{ success: boolean; data: { summary: { averageRating: number; totalRatings: number } } }>(
-              `/ratings/doctor/${d.id}`
-            );
+            const { data: r } = await api.get<{
+              success: boolean;
+              data: { summary: { averageRating: number; totalRatings: number } };
+            }>(`/ratings/doctor/${d.id}`);
             out[d.id] = r.data?.summary ?? { averageRating: 0, totalRatings: 0 };
           } catch {
             out[d.id] = { averageRating: 0, totalRatings: 0 };
@@ -87,65 +87,29 @@ export default function Doctors() {
           No doctors found.
         </div>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {doctors.map((doc) => {
             const rating = ratingsMap?.[doc.id] ?? { averageRating: 0, totalRatings: 0 };
-            const name = doc.user ? `Dr. ${doc.user.firstName} ${doc.user.lastName}` : 'Doctor';
+            const name = doc.user
+              ? `Dr. ${doc.user.firstName} ${doc.user.lastName}`
+              : 'Doctor';
             const imgSrc = doc.profileImage
-              ? (doc.profileImage.startsWith('http') ? doc.profileImage : `${API_BASE}${doc.profileImage}`)
+              ? doc.profileImage.startsWith('http')
+                ? doc.profileImage
+                : `${API_BASE}${doc.profileImage}`
               : null;
             return (
-              <Link
+              <DoctorCard
                 key={doc.id}
-                to={`/doctors/${doc.id}`}
-                className="rounded-3xl bg-white border-2 border-sky-200 overflow-hidden flex flex-col hover:border-[#3990D7]/50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#3990D7] focus:ring-offset-2"
-              >
-                <div className="relative h-56 sm:h-60 bg-sky-50/80 flex items-center justify-center overflow-hidden rounded-t-[22px]">
-                  {imgSrc ? (
-                    <img
-                      src={imgSrc}
-                      alt={name}
-                      className="w-full h-full object-cover object-top"
-                    />
-                  ) : (
-                    <UserCircleIcon className="w-20 h-20 text-sky-300" />
-                  )}
-                </div>
-                <div className="p-5 flex flex-col flex-1">
-                  <p className="flex items-center gap-1.5 text-sm font-medium text-green-600 mb-1">
-                    <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-                    Available
-                  </p>
-                  <h3 className="text-xl font-bold text-gray-900 truncate">{name}</h3>
-                  <p className="text-base text-gray-500 mt-0.5">
-                    {doc.department || 'General physician'}
-                  </p>
-                  <p className="text-sm text-gray-600 mt-1 min-h-[20px]">
-                    {rating.totalRatings > 0
-                      ? `★ ${rating.averageRating.toFixed(1)} (${rating.totalRatings})`
-                      : 'No ratings yet'}
-                  </p>
-                  <div className="mt-auto pt-4" onClick={(e) => e.preventDefault()}>
-                    {isPatient ? (
-                      <Link
-                        to={`/app/appointments?book=${doc.id}`}
-                        className="block w-full text-center rounded-full bg-[#3990D7] py-3 px-4 text-sm font-medium text-white hover:bg-[#2d7ab8] transition-colors cursor-pointer"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        Book Now
-                      </Link>
-                    ) : (
-                      <Link
-                        to="/login?redirect=/doctors"
-                        className="block w-full text-center rounded-full border-2 border-[#3990D7] py-3 px-4 text-sm font-medium text-[#3990D7] hover:bg-[#EAEFFF] transition-colors cursor-pointer"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        Sign in to book
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              </Link>
+                id={doc.id}
+                name={name}
+                department={doc.department}
+                imgSrc={imgSrc}
+                averageRating={rating.averageRating}
+                totalRatings={rating.totalRatings}
+                consultationFee={doc.consultationFee}
+                isPatient={isPatient}
+              />
             );
           })}
         </div>
