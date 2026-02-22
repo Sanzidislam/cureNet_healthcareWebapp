@@ -9,6 +9,7 @@ import {
   ArrowRightIcon,
   ChartBarIcon,
   SparklesIcon,
+  ChatBubbleLeftEllipsisIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '../context/AuthContext';
@@ -89,20 +90,83 @@ const statCards: StatCard[] = [
 ];
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-amber-50 text-amber-700 border border-amber-200',
-  confirmed: 'bg-blue-50 text-blue-700 border border-blue-200',
-  'in-progress': 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+  requested: 'bg-amber-50 text-amber-700 border border-amber-200',
+  approved: 'bg-blue-50 text-blue-700 border border-blue-200',
+  in_progress: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
   completed: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
   cancelled: 'bg-rose-50 text-rose-700 border border-rose-200',
+  rejected: 'bg-slate-100 text-slate-500 border border-slate-200',
 };
 
-function formatTime(iso?: string) {
+const STATUS_LABELS: Record<string, string> = {
+  requested: 'Requested',
+  approved: 'Approved',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  rejected: 'Rejected',
+};
+
+type Appointment = {
+  id: number;
+  appointmentDate?: string;
+  window?: string;
+  serial?: number;
+  status?: string;
+  patient?: { user?: { firstName?: string; lastName?: string } };
+};
+
+type Review = {
+  id: number;
+  rating: number;
+  review?: string;
+  createdAt?: string;
+};
+
+function StarRating({ score }: { score: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <StarIcon
+          key={s}
+          className={`w-4 h-4 ${s <= score ? 'text-amber-400' : 'text-slate-200'}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function formatDate(iso?: string) {
   if (!iso) return '—';
   try {
-    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return iso;
-  }
+    return new Date(iso).toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric',
+    });
+  } catch { return iso; }
+}
+
+function timeAgo(iso?: string) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
+function patientInitials(apt: Appointment) {
+  const first = apt.patient?.user?.firstName?.[0] ?? '?';
+  const last = apt.patient?.user?.lastName?.[0] ?? '';
+  return (first + last).toUpperCase();
+}
+
+function patientName(apt: Appointment) {
+  const f = apt.patient?.user?.firstName;
+  const l = apt.patient?.user?.lastName;
+  if (f || l) return `${f ?? ''} ${l ?? ''}`.trim();
+  return `Patient #${apt.id}`;
 }
 
 export default function DoctorDashboard() {
@@ -121,13 +185,13 @@ export default function DoctorDashboard() {
   });
 
   const { data: ratingsData } = useQuery({
-    queryKey: ['ratings', doctorId],
+    queryKey: ['ratings', doctorId, 'full'],
     queryFn: async () => {
       const { data } = await api.get<{
         success: boolean;
-        data: { summary: { averageRating: number; totalRatings: number } };
+        data: { summary: { averageRating: number; totalRatings: number }; ratings: Review[] };
       }>(`/ratings/doctor/${doctorId}`);
-      return data.data?.summary ?? { averageRating: 0, totalRatings: 0 };
+      return data.data ?? { summary: { averageRating: 0, totalRatings: 0 }, ratings: [] };
     },
     enabled: !!doctorId,
   });
@@ -136,7 +200,7 @@ export default function DoctorDashboard() {
     queryKey: ['doctors', doctorId, 'appointments', 'today'],
     queryFn: async () => {
       const today = new Date().toISOString().slice(0, 10);
-      const { data } = await api.get<{ success: boolean; data: { appointments: unknown[] } }>(
+      const { data } = await api.get<{ success: boolean; data: { appointments: Appointment[] } }>(
         `/doctors/${doctorId}/appointments?date=${today}`
       );
       return data.data?.appointments ?? [];
@@ -144,22 +208,32 @@ export default function DoctorDashboard() {
     enabled: !!doctorId,
   });
 
+  // Upcoming: next 5 appointments after today
+  const { data: upcomingAppointments } = useQuery({
+    queryKey: ['doctors', doctorId, 'appointments', 'upcoming'],
+    queryFn: async () => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const fromDate = tomorrow.toISOString().slice(0, 10);
+      const { data } = await api.get<{ success: boolean; data: { appointments: Appointment[] } }>(
+        `/doctors/${doctorId}/appointments?limit=5&sortBy=appointmentDate&sortOrder=ASC`
+      );
+      // Filter to only future dates client-side (API may not support fromDate filter)
+      const all = data.data?.appointments ?? [];
+      return all.filter((a) => (a.appointmentDate ?? '') >= fromDate).slice(0, 5);
+    },
+    enabled: !!doctorId,
+  });
+
   const stats = statsData ?? {};
-  const summary = ratingsData ?? { averageRating: 0, totalRatings: 0 };
+  const summary = ratingsData?.summary ?? { averageRating: 0, totalRatings: 0 };
+  const recentReviews = (ratingsData?.ratings ?? []).slice(0, 5);
   const pendingCount = stats.requestedAppointments ?? 0;
-  const appointments = (todayAppointments ?? []) as {
-    id: number;
-    appointmentTime?: string;
-    status?: string;
-    patientName?: string;
-    window?: string;
-  }[];
+  const appointments = todayAppointments ?? [];
+  const upcoming = upcomingAppointments ?? [];
 
   const todayStr = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
   return (
@@ -167,7 +241,6 @@ export default function DoctorDashboard() {
 
       {/* ===== HERO HEADER ===== */}
       <div className="relative rounded-3xl bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-800 px-8 py-10 overflow-hidden shadow-xl">
-        {/* Decorative blobs */}
         <div className="absolute -top-16 -right-16 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-16 -left-10 w-80 h-80 rounded-full bg-blue-400/20 blur-3xl pointer-events-none" />
 
@@ -181,20 +254,16 @@ export default function DoctorDashboard() {
               Here's an overview of your practice today. Stay on top of appointments and patient care.
             </p>
           </div>
-
-          {/* Rating badge */}
-          <div className="shrink-0">
-            <div className="inline-flex flex-col items-center gap-1 bg-white/15 backdrop-blur-sm border border-white/25 rounded-2xl px-6 py-4 shadow-lg">
-              <div className="flex items-center gap-1.5">
-                <StarIcon className="w-6 h-6 text-amber-300" />
-                <span className="text-3xl font-extrabold text-white">
-                  {summary.totalRatings > 0 ? summary.averageRating.toFixed(1) : '—'}
-                </span>
-              </div>
-              <span className="text-indigo-200 text-xs font-semibold uppercase tracking-wider">
-                {summary.totalRatings > 0 ? `${summary.totalRatings} Reviews` : 'No reviews yet'}
+          <div className="shrink-0 inline-flex flex-col items-center gap-1 bg-white/15 backdrop-blur-sm border border-white/25 rounded-2xl px-6 py-4 shadow-lg">
+            <div className="flex items-center gap-1.5">
+              <StarIcon className="w-6 h-6 text-amber-300" />
+              <span className="text-3xl font-extrabold text-white">
+                {summary.totalRatings > 0 ? summary.averageRating.toFixed(1) : '—'}
               </span>
             </div>
+            <span className="text-indigo-200 text-xs font-semibold uppercase tracking-wider">
+              {summary.totalRatings > 0 ? `${summary.totalRatings} Reviews` : 'No reviews yet'}
+            </span>
           </div>
         </div>
       </div>
@@ -207,11 +276,9 @@ export default function DoctorDashboard() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-amber-800">
-              {pendingCount} appointment request{pendingCount > 1 ? 's' : ''} awaiting your approval
+              {pendingCount} appointment request{pendingCount > 1 ? 's' : ''} awaiting approval
             </p>
-            <p className="text-sm text-amber-700 mt-0.5">
-              Review and accept or decline to keep your schedule up to date.
-            </p>
+            <p className="text-sm text-amber-700 mt-0.5">Review and accept or decline to keep your schedule up to date.</p>
           </div>
           <Link
             to="/app/doctor-appointments"
@@ -229,7 +296,6 @@ export default function DoctorDashboard() {
             key={key}
             className={`relative rounded-2xl bg-gradient-to-br ${gradient} border ${border} p-5 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group`}
           >
-            {/* Subtle decorative circle */}
             <div className={`absolute -right-4 -top-4 w-20 h-20 rounded-full ${bg} opacity-60 group-hover:opacity-80 transition-opacity`} />
             <div className="relative z-10 flex items-start justify-between">
               <div>
@@ -246,59 +312,170 @@ export default function DoctorDashboard() {
         ))}
       </div>
 
-      {/* ===== TODAY'S SCHEDULE ===== */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl shadow-inner">
-              <CalendarDaysIcon className="w-5 h-5" />
+      {/* ===== TWO-COLUMN: Today's Schedule + Upcoming ===== */}
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+
+        {/* Today's Schedule – wider */}
+        <div className="xl:col-span-3 bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl shadow-inner">
+                <CalendarDaysIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Today's Schedule</h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  {appointments.length} appointment{appointments.length !== 1 ? 's' : ''} scheduled
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-900">Today's Schedule</h3>
-              <p className="text-xs text-slate-500 font-medium">{appointments.length} appointment{appointments.length !== 1 ? 's' : ''} scheduled</p>
-            </div>
+            <Link to="/app/doctor-appointments" className="inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600 hover:text-indigo-500 transition-colors">
+              View all <ArrowRightIcon className="w-4 h-4" />
+            </Link>
           </div>
-          <Link
-            to="/app/doctor-appointments"
-            className="inline-flex items-center gap-1.5 text-sm font-bold text-indigo-600 hover:text-indigo-500 transition-colors"
-          >
-            View all <ArrowRightIcon className="w-4 h-4" />
-          </Link>
+
+          {appointments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-14 gap-3 text-center">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                <CalendarDaysIcon className="w-6 h-6 text-slate-400" />
+              </div>
+              <p className="text-slate-600 font-semibold">No appointments today</p>
+              <p className="text-xs text-slate-400">Enjoy the free time or update your availability.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {(appointments as Appointment[]).map((apt, idx) => (
+                <div key={apt.id} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-slate-50/70 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                      <span className="text-indigo-600 font-bold text-xs">{String(idx + 1).padStart(2, '0')}</span>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-800 text-sm">{patientName(apt)}</p>
+                      <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                        <ClockIcon className="w-3.5 h-3.5" />
+                        {apt.window ? <span className="capitalize">{apt.window} session</span> : formatDate(apt.appointmentDate)}
+                        {apt.serial != null && <span>· #{apt.serial}</span>}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${STATUS_STYLES[apt.status ?? ''] ?? 'bg-slate-100 text-slate-600'}`}>
+                    {STATUS_LABELS[apt.status ?? ''] ?? apt.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {appointments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
-            <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mb-2">
-              <CalendarDaysIcon className="w-7 h-7 text-slate-400" />
+        {/* Upcoming Appointments – narrower */}
+        <div className="xl:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-violet-50/50 to-white">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-violet-100 text-violet-600 rounded-xl shadow-inner">
+                <SparklesIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Upcoming</h3>
+                <p className="text-xs text-slate-500 font-medium">Next scheduled visits</p>
+              </div>
             </div>
-            <p className="text-slate-700 font-semibold">No appointments today</p>
-            <p className="text-sm text-slate-400">Enjoy the free time or update your availability.</p>
+            <Link to="/app/doctor-appointments" className="text-xs font-bold text-violet-600 hover:text-violet-500 transition-colors">
+              See all
+            </Link>
+          </div>
+
+          {upcoming.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-14 gap-3 text-center px-4">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                <SparklesIcon className="w-6 h-6 text-slate-400" />
+              </div>
+              <p className="text-slate-600 font-semibold text-sm">No upcoming appointments</p>
+              <p className="text-xs text-slate-400">Your schedule beyond today is clear.</p>
+            </div>
+          ) : (
+            <div className="p-4 space-y-3">
+              {upcoming.map((apt) => (
+                <div key={apt.id} className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100 hover:border-violet-200 hover:bg-violet-50/30 transition-all">
+                  <div className="w-10 h-10 rounded-xl bg-violet-100 flex flex-col items-center justify-center shrink-0 shadow-inner">
+                    <span className="text-[10px] font-black text-violet-500 uppercase leading-none">
+                      {new Date(apt.appointmentDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' })}
+                    </span>
+                    <span className="text-lg font-extrabold text-violet-700 leading-none">
+                      {new Date(apt.appointmentDate + 'T12:00:00').getDate()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-800 truncate">{patientName(apt)}</p>
+                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                      {apt.window ? <span className="capitalize">{apt.window}</span> : '—'}
+                      {apt.serial != null && <span>· Serial #{apt.serial}</span>}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_STYLES[apt.status ?? ''] ?? 'bg-slate-100 text-slate-600'}`}>
+                    {STATUS_LABELS[apt.status ?? ''] ?? apt.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ===== RECENT REVIEWS ===== */}
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-amber-50/50 to-white">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 text-amber-600 rounded-xl shadow-inner">
+              <ChatBubbleLeftEllipsisIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Recent Patient Reviews</h3>
+              <p className="text-xs text-slate-500 font-medium">
+                {summary.totalRatings} total · {summary.averageRating.toFixed(1)} avg rating
+              </p>
+            </div>
+          </div>
+          {/* Overall star display */}
+          <div className="flex items-center gap-2">
+            <StarRating score={Math.round(summary.averageRating)} />
+            <span className="text-sm font-bold text-amber-600">
+              {summary.totalRatings > 0 ? summary.averageRating.toFixed(1) : '—'}
+            </span>
+          </div>
+        </div>
+
+        {recentReviews.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-14 gap-3 text-center">
+            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+              <ChatBubbleLeftEllipsisIcon className="w-6 h-6 text-slate-400" />
+            </div>
+            <p className="text-slate-600 font-semibold">No reviews yet</p>
+            <p className="text-xs text-slate-400">Completed appointments can be rated by patients.</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
-            {appointments.map((apt, idx) => (
-              <div
-                key={apt.id}
-                className={`px-6 py-4 flex items-center justify-between gap-4 hover:bg-slate-50/70 transition-colors ${idx % 2 === 0 ? '' : ''}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
-                    <span className="text-indigo-600 font-bold text-sm">{String(idx + 1).padStart(2, '0')}</span>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-slate-900 text-sm">
-                      {apt.patientName ?? `Appointment #${apt.id}`}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                      <ClockIcon className="w-3.5 h-3.5" />
-                      {formatTime(apt.appointmentTime)}
-                      {apt.window && <span className="ml-1 capitalize">· {apt.window}</span>}
-                    </p>
-                  </div>
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recentReviews.map((r) => (
+              <div key={r.id} className="rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4 space-y-3 hover:border-amber-200 hover:shadow-sm transition-all">
+                <div className="flex items-center justify-between">
+                  <StarRating score={r.rating} />
+                  <span className="text-xs text-slate-400 font-medium">{timeAgo(r.createdAt)}</span>
                 </div>
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold capitalize ${STATUS_STYLES[apt.status ?? ''] ?? 'bg-slate-100 text-slate-600'}`}>
-                  {apt.status ?? 'unknown'}
-                </span>
+                {r.review ? (
+                  <p className="text-sm text-slate-700 leading-relaxed line-clamp-3 font-medium italic">
+                    "{r.review}"
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">No written review</p>
+                )}
+                <div className="flex items-center justify-between pt-1">
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${r.rating >= 4 ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                      : r.rating === 3 ? 'bg-amber-50 text-amber-700 border border-amber-100'
+                        : 'bg-rose-50 text-rose-700 border border-rose-100'
+                    }`}>
+                    <StarIcon className="w-3 h-3" /> {r.rating}/5
+                  </span>
+                </div>
               </div>
             ))}
           </div>
