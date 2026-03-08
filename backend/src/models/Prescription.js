@@ -21,7 +21,7 @@ const Prescription = sequelize.define(
     medicines: {
       type: DataTypes.JSON,
       allowNull: true,
-      comment: 'Array of { name, dosage, duration }',
+      comment: 'Array of { name, strength, dose, unit, frequency, duration, route, instructions }',
     },
     notes: { type: DataTypes.TEXT, allowNull: true },
   },

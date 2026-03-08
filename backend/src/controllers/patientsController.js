@@ -109,14 +109,24 @@ export async function getDashboardStats(req, res) {
       return res.status(403).json({ success: false, message: 'Unauthorized' });
     }
     const today = new Date().toISOString().slice(0, 10);
-    const [totalAppointments, todayAppointments, completedAppointments, pendingAppointments, requestedAppointments, scheduledAppointments] = await Promise.all([
+    const [totalAppointments, todayAppointments, completedAppointments, pendingAppointments, requestedAppointments, scheduledAppointments, patient] = await Promise.all([
       Appointment.count({ where: { patientId } }),
       Appointment.count({ where: { patientId, appointmentDate: today, status: { [Op.notIn]: ['cancelled', 'rejected'] } } }),
       Appointment.count({ where: { patientId, status: 'completed' } }),
       Appointment.count({ where: { patientId, status: 'approved' } }),
       Appointment.count({ where: { patientId, status: 'requested' } }),
       Appointment.count({ where: { patientId, status: ['approved', 'in_progress'] } }),
+      Patient.findByPk(patientId, {
+        include: [{ model: User, as: 'User', attributes: ['phone', 'dateOfBirth'] }],
+      }),
     ]);
+    const profileComplete = Boolean(
+      patient?.bloodType
+      && patient?.emergencyContact
+      && patient?.emergencyPhone
+      && patient?.User?.phone
+      && patient?.User?.dateOfBirth
+    );
     return res.json({
       success: true,
       data: {
@@ -126,6 +136,11 @@ export async function getDashboardStats(req, res) {
         pendingAppointments,
         requestedAppointments,
         scheduledAppointments,
+        queue: {
+          profileComplete,
+          pendingActions: requestedAppointments + (profileComplete ? 0 : 1),
+          needsProfileCompletion: !profileComplete,
+        },
       },
     });
   } catch (err) {

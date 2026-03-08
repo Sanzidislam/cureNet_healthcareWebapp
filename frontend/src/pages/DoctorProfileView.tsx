@@ -15,6 +15,17 @@ import {
 import { api, useAuth } from '../context/AuthContext';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'http://localhost:5000';
+const RED_FLAG_TERMS = [
+  'chest pain',
+  'shortness of breath',
+  'breathing problem',
+  'stroke',
+  'fainting',
+  'unconscious',
+  'severe bleeding',
+  'suicidal',
+  'seizure',
+];
 
 interface DoctorProfileData {
   id: number;
@@ -51,6 +62,10 @@ export default function DoctorProfileView() {
   const [selectedWindow, setSelectedWindow] = useState('');
   const [reason, setReason] = useState('');
   const [symptoms, setSymptoms] = useState('');
+  const [triageConfirmed, setTriageConfirmed] = useState(false);
+  const combinedNotes = `${reason} ${symptoms}`.toLowerCase();
+  const matchedRedFlags = RED_FLAG_TERMS.filter((term) => combinedNotes.includes(term));
+  const hasRedFlags = matchedRedFlags.length > 0;
 
   const { data: profileRes, isLoading: loadingProfile, error: profileError } = useQuery({
     queryKey: ['doctor', id],
@@ -61,20 +76,21 @@ export default function DoctorProfileView() {
     enabled: !!id,
   });
 
-  const { data: availableWindows = [], isLoading: windowsLoading } = useQuery({
+  const { data: windowData, isLoading: windowsLoading } = useQuery({
     queryKey: ['available-slots', id, selectedDate],
     queryFn: async () => {
-      const { data } = await api.get<{ success: boolean; data: { windows: Array<{ window: string; label: string; timeRange: string; enabled: boolean; maxPatients: number | null; booked: number; spotsLeft: number; available: boolean }> } }>(
+      const { data } = await api.get<{ success: boolean; data: { windows: Array<{ window: string; label: string; timeRange: string; enabled: boolean; maxPatients: number | null; booked: number; spotsLeft: number; available: boolean }>; blackout?: boolean; message?: string } }>(
         `/doctors/${id}/available-slots`,
         { params: { date: selectedDate } }
       );
-      return data.data?.windows ?? [];
+      return data.data ?? { windows: [] };
     },
     enabled: !!id && !!selectedDate,
   });
+  const availableWindows = windowData?.windows ?? [];
 
   const bookMutation = useMutation({
-    mutationFn: (body: { doctorId: number; appointmentDate: string; window: string; type: string; reason?: string; symptoms?: string }) =>
+    mutationFn: (body: { doctorId: number; appointmentDate: string; window: string; type: string; reason?: string; symptoms?: string; triageConfirmed?: boolean }) =>
       api.post('/appointments', body),
     onSuccess: () => {
       toast.success('Appointment requested');
@@ -82,11 +98,17 @@ export default function DoctorProfileView() {
       setSelectedWindow('');
       setReason('');
       setSymptoms('');
+      setTriageConfirmed(false);
       queryClient.invalidateQueries({ queryKey: ['available-slots', id] });
       queryClient.invalidateQueries({ queryKey: ['doctor', id, 'upcoming-slots'] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
+    onError: (err: { response?: { data?: { message?: string; code?: string; data?: { missingFields?: string[] } } } }) => {
+      if (err.response?.data?.code === 'PROFILE_INCOMPLETE') {
+        const missing = err.response.data.data?.missingFields?.join(', ') || 'required fields';
+        toast.error(`Complete your profile first: ${missing}`);
+        return;
+      }
       toast.error(err.response?.data?.message ?? 'Failed to book');
     },
   });
@@ -301,6 +323,10 @@ export default function DoctorProfileView() {
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">Available windows</label>
                         {windowsLoading ? (
                           <p className="text-sm text-gray-500">Loading windows...</p>
+                        ) : windowData?.blackout ? (
+                          <p className="text-sm text-rose-700 bg-rose-50 rounded-lg px-3 py-2">
+                            {windowData.message ?? 'Doctor is unavailable on this date. Please choose another date.'}
+                          </p>
                         ) : availableWindows.length === 0 || availableWindows.every((w) => !w.available) ? (
                           <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
                             No available window for this date. Try another.
@@ -357,12 +383,33 @@ export default function DoctorProfileView() {
                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-[#3990D7] focus:border-[#3990D7]"
                       />
                     </div>
+                    {hasRedFlags && (
+                      <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                        <p className="font-semibold">Possible urgent symptoms detected.</p>
+                        <p className="mt-1 text-xs">
+                          If this is an emergency, contact emergency services immediately. Matched terms: {matchedRedFlags.join(', ')}.
+                        </p>
+                        <label className="mt-2 flex items-start gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={triageConfirmed}
+                            onChange={(e) => setTriageConfirmed(e.target.checked)}
+                            className="mt-0.5"
+                          />
+                          <span>I understand and still want to request a non-emergency consultation.</span>
+                        </label>
+                      </div>
+                    )}
 
                     <button
                       type="button"
                       disabled={!selectedDate || !selectedWindow || bookMutation.isPending}
                       onClick={() => {
                         if (!id || !selectedDate || !selectedWindow) return;
+                        if (hasRedFlags && !triageConfirmed) {
+                          toast.error('Please acknowledge the red-flag warning before continuing');
+                          return;
+                        }
                         bookMutation.mutate({
                           doctorId: parseInt(id, 10),
                           appointmentDate: selectedDate,
@@ -370,6 +417,7 @@ export default function DoctorProfileView() {
                           type: 'in_person',
                           reason: reason || undefined,
                           symptoms: symptoms || undefined,
+                          triageConfirmed: hasRedFlags ? triageConfirmed : undefined,
                         });
                       }}
                       className="w-full rounded-xl bg-gradient-to-r from-[#3990D7] to-[#2d7ab8] py-3.5 px-4 text-base font-semibold text-white hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"

@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
-import { useForm } from 'react-hook-form';
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { api, useAuth } from '../context/AuthContext';
@@ -45,6 +46,7 @@ interface DoctorForm {
   awards?: string[];
   languages?: string[];
   services?: string[];
+  unavailableDates?: string[];
 }
 
 const WINDOWS = [
@@ -98,6 +100,8 @@ export default function DoctorProfile() {
 
   // Local state for complex fields
   const [chamberWindows, setChamberWindows] = useState<ChamberWindows>(emptyChamberWindows());
+  const [unavailableDates, setUnavailableDates] = useState<string[]>([]);
+  const [newUnavailableDate, setNewUnavailableDate] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const { data: profileData } = useQuery({
@@ -130,7 +134,7 @@ export default function DoctorProfile() {
   });
 
   // Master reset function to push DB state into form
-  const resetFormToDB = () => {
+  const resetFormToDB = useCallback(() => {
     if (doctor) {
       form.reset({
         department: doctor.department ?? '',
@@ -145,23 +149,30 @@ export default function DoctorProfile() {
         awards: Array.isArray(doctor.awards) ? doctor.awards : [],
         languages: Array.isArray(doctor.languages) ? doctor.languages : [],
         services: Array.isArray(doctor.services) ? doctor.services : [],
+        unavailableDates: Array.isArray(doctor.unavailableDates) ? doctor.unavailableDates : [],
       });
       setChamberWindows(normalizeChamberWindows(doctor.chamberWindows));
+      setUnavailableDates(Array.isArray(doctor.unavailableDates) ? doctor.unavailableDates : []);
       if (doctor.profileImage) {
         setPreviewUrl(doctor.profileImage.startsWith('http') ? doctor.profileImage : `${API_ORIGIN}${doctor.profileImage}`);
       }
     }
-  };
+  }, [doctor, form]);
 
   useEffect(() => {
     resetFormToDB();
-  }, [doctor]);
+  }, [resetFormToDB]);
+
+  const degreesItems = useWatch({ control: form.control, name: 'degrees' }) ?? [];
+  const servicesItems = useWatch({ control: form.control, name: 'services' }) ?? [];
+  const languagesItems = useWatch({ control: form.control, name: 'languages' }) ?? [];
+  const awardsItems = useWatch({ control: form.control, name: 'awards' }) ?? [];
 
   const updateMutation = useMutation({
     mutationFn: async (payload: DoctorForm | FormData) => {
       // If it's pure JSON, merge with chamber windows
       if (!(payload instanceof FormData)) {
-        await api.put('/doctors/profile', { ...payload, chamberWindows });
+        await api.put('/doctors/profile', { ...payload, chamberWindows, unavailableDates });
       } else {
         // We handle image upload via the dedicated route
         await api.post('/doctors/upload-image', payload, {
@@ -199,8 +210,7 @@ export default function DoctorProfile() {
   };
 
   // Helper for rendering array-based fields
-  const renderListField = (fieldKey: 'degrees' | 'awards' | 'languages' | 'services', label: string) => {
-    const items = form.watch(fieldKey) ?? [];
+  const renderListField = (fieldKey: 'degrees' | 'awards' | 'languages' | 'services', label: string, items: string[]) => {
     return (
       <div key={fieldKey} className="col-span-1">
         <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
@@ -422,10 +432,10 @@ export default function DoctorProfile() {
 
               {/* List fields */}
               <div className="space-y-6">
-                {renderListField('degrees', 'Academic Degrees')}
-                {renderListField('services', 'Medical Services')}
-                {renderListField('languages', 'Languages Spoken')}
-                {renderListField('awards', 'Notable Awards')}
+                {renderListField('degrees', 'Academic Degrees', degreesItems)}
+                {renderListField('services', 'Medical Services', servicesItems)}
+                {renderListField('languages', 'Languages Spoken', languagesItems)}
+                {renderListField('awards', 'Notable Awards', awardsItems)}
               </div>
 
             </div>
@@ -575,6 +585,7 @@ export default function DoctorProfile() {
                     onClick={() => {
                       setEditingChamber(false);
                       resetFormToDB();
+                      setNewUnavailableDate('');
                     }}
                     className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors"
                   >
@@ -686,6 +697,56 @@ export default function DoctorProfile() {
                     })}
                   </tbody>
                 </table>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Blackout Dates</h4>
+                <p className="text-xs text-slate-500 mb-3">
+                  Mark dates when you are unavailable. Patients cannot book appointments on these dates.
+                </p>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {unavailableDates.length === 0 ? (
+                    <span className="text-xs text-slate-400">No blackout dates added</span>
+                  ) : (
+                    unavailableDates.map((d) => (
+                      <span key={d} className="inline-flex items-center gap-1 rounded-full bg-rose-50 border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-700">
+                        {d}
+                        {editingChamber && (
+                          <button
+                            type="button"
+                            onClick={() => setUnavailableDates((prev) => prev.filter((x) => x !== d))}
+                            className="text-rose-500 hover:text-rose-700"
+                            aria-label={`Remove ${d}`}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </span>
+                    ))
+                  )}
+                </div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="date"
+                    value={newUnavailableDate}
+                    onChange={(e) => setNewUnavailableDate(e.target.value)}
+                    min={new Date().toISOString().slice(0, 10)}
+                    disabled={!editingChamber}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+                  />
+                  <button
+                    type="button"
+                    disabled={!editingChamber || !newUnavailableDate}
+                    onClick={() => {
+                      if (!newUnavailableDate) return;
+                      setUnavailableDates((prev) => Array.from(new Set([...prev, newUnavailableDate])).sort());
+                      setNewUnavailableDate('');
+                    }}
+                    className="px-3 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    Add Date
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -56,6 +56,11 @@ const Doctor = sequelize.define(
     awards: { type: DataTypes.JSON, allowNull: true },
     languages: { type: DataTypes.JSON, allowNull: true },
     services: { type: DataTypes.JSON, allowNull: true },
+    unavailableDates: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'Doctor blackout dates: ["YYYY-MM-DD", ...]',
+    },
   },
   {
     tableName: 'doctors',

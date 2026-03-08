@@ -29,6 +29,11 @@ interface Stats {
   completedToday?: number;
   pendingToday?: number;
   reportsGenerated?: number;
+  queue?: {
+    pendingDoctorVerifications?: number;
+    pendingAppointmentApprovals?: number;
+    todaysOperationalLoad?: number;
+  };
 }
 
 interface DoctorRow {
@@ -245,6 +250,30 @@ export default function AdminDashboard() {
           icon={DocumentChartBarIcon}
         />
       </div>
+
+      {/* Quick actions */}
+      {stats.queue && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <QueueCard
+            title="Pending Doctor Verifications"
+            value={stats.queue.pendingDoctorVerifications ?? 0}
+            actionLabel="Review doctors"
+            actionTo="/app/admin-doctors?pending=true"
+          />
+          <QueueCard
+            title="Pending Appointment Approvals"
+            value={stats.queue.pendingAppointmentApprovals ?? 0}
+            actionLabel="Open appointments"
+            actionTo="/app/admin-analytics"
+          />
+          <QueueCard
+            title="Today's Operational Load"
+            value={stats.queue.todaysOperationalLoad ?? 0}
+            actionLabel="View dashboard"
+            actionTo="/app/admin-dashboard"
+          />
+        </div>
+      )}
 
       {/* Quick actions */}
       <div className="flex flex-wrap gap-3">
@@ -539,6 +568,18 @@ export default function AdminDashboard() {
           </table>
         </div>
       </section>
+    </div>
+  );
+}
+
+function QueueCard({ title, value, actionLabel, actionTo }: { title: string; value: number; actionLabel: string; actionTo: string }) {
+  return (
+    <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{title}</p>
+      <p className="mt-1 text-2xl font-bold text-blue-900">{value}</p>
+      <Link to={actionTo} className="mt-2 inline-block text-sm font-medium text-blue-700 hover:underline">
+        {actionLabel}
+      </Link>
     </div>
   );
 }

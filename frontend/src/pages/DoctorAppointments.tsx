@@ -196,14 +196,42 @@ interface PrescriptionFormModalProps {
 interface PrescriptionData {
   id: number;
   diagnosis?: string;
-  medicines?: { name: string; dosage: string; duration: string }[];
+  medicines?: MedicineEntry[];
   notes?: string;
+}
+
+interface MedicineEntry {
+  name: string;
+  dosage?: string;
+  frequency?: string;
+  duration?: string;
+  instructions?: string;
+}
+
+function emptyMedicine(): MedicineEntry {
+  return { name: '', dosage: '', frequency: '', duration: '', instructions: '' };
+}
+
+function normalizeMedicine(m: MedicineEntry): MedicineEntry {
+  return {
+    name: m.name || '',
+    dosage: m.dosage || '',
+    frequency: m.frequency || '',
+    duration: m.duration || '',
+    instructions: m.instructions || '',
+  };
+}
+
+function formatMedicineForDisplay(m: MedicineEntry): string {
+  const details = [m.dosage, m.frequency, m.duration].filter(Boolean).join(' | ');
+  const extra = m.instructions ? ` (${m.instructions})` : '';
+  return `${m.name}${details ? ` — ${details}` : ''}${extra}`;
 }
 
 function PrescriptionFormModal({ appointmentId, onClose }: PrescriptionFormModalProps) {
   const queryClient = useQueryClient();
   const [diagnosis, setDiagnosis] = useState('');
-  const [medicines, setMedicines] = useState<{ name: string; dosage: string; duration: string }[]>([{ name: '', dosage: '', duration: '' }]);
+  const [medicines, setMedicines] = useState<MedicineEntry[]>([emptyMedicine()]);
   const [notes, setNotes] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
@@ -236,18 +264,18 @@ function PrescriptionFormModal({ appointmentId, onClose }: PrescriptionFormModal
     if (existing) {
       setDiagnosis(existing.diagnosis || '');
       setNotes(existing.notes || '');
-      setMedicines(existing.medicines?.length ? existing.medicines : [{ name: '', dosage: '', duration: '' }]);
+      setMedicines(existing.medicines?.length ? existing.medicines.map(normalizeMedicine) : [emptyMedicine()]);
       setIsEditing(false);
     } else {
       setDiagnosis('');
       setNotes('');
-      setMedicines([{ name: '', dosage: '', duration: '' }]);
+      setMedicines([emptyMedicine()]);
       setIsEditing(true);
     }
   }, [existing, loadingExisting]);
 
   const createMutation = useMutation({
-    mutationFn: (body: { appointmentId: number; diagnosis?: string; medicines?: { name: string; dosage: string; duration: string }[]; notes?: string }) =>
+    mutationFn: (body: { appointmentId: number; diagnosis?: string; medicines?: MedicineEntry[]; notes?: string }) =>
       api.post('/prescriptions', body),
     onSuccess: () => {
       toast.success('Prescription saved');
@@ -260,7 +288,7 @@ function PrescriptionFormModal({ appointmentId, onClose }: PrescriptionFormModal
   });
 
   const updateMutation = useMutation({
-    mutationFn: (body: { id: number; diagnosis?: string; medicines?: { name: string; dosage: string; duration: string }[]; notes?: string }) =>
+    mutationFn: (body: { id: number; diagnosis?: string; medicines?: MedicineEntry[]; notes?: string }) =>
       api.put(`/prescriptions/${body.id}`, body),
     onSuccess: () => {
       toast.success('Prescription updated');
@@ -272,17 +300,17 @@ function PrescriptionFormModal({ appointmentId, onClose }: PrescriptionFormModal
     },
   });
 
-  const addRow = () => setMedicines((m) => [...m, { name: '', dosage: '', duration: '' }]);
+  const addRow = () => setMedicines((m) => [...m, emptyMedicine()]);
   const removeRow = (indexToRemove: number) => {
     setMedicines((m) => m.filter((_, i) => i !== indexToRemove));
   };
-  const updateRow = (i: number, field: 'name' | 'dosage' | 'duration', value: string) => {
+  const updateRow = (i: number, field: keyof MedicineEntry, value: string) => {
     setMedicines((m) => m.map((row, j) => (j === i ? { ...row, [field]: value } : row)));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const meds = medicines.filter((m) => m.name.trim());
+    const meds = medicines.map(normalizeMedicine).filter((m) => m.name.trim());
     const payload = {
       diagnosis: diagnosis || undefined,
       medicines: meds.length ? meds : undefined,
@@ -316,7 +344,7 @@ function PrescriptionFormModal({ appointmentId, onClose }: PrescriptionFormModal
                   <p className="font-medium">Medicines:</p>
                   <ul className="list-disc list-inside ml-4">
                     {existing.medicines.map((m, i) => (
-                      <li key={i}>{m.name} {m.dosage && `— ${m.dosage}`} {m.duration && `(${m.duration})`}</li>
+                      <li key={i}>{formatMedicineForDisplay(m)}</li>
                     ))}
                   </ul>
                 </div>
@@ -345,34 +373,50 @@ function PrescriptionFormModal({ appointmentId, onClose }: PrescriptionFormModal
                 </div>
                 <div className="space-y-2">
                   {medicines.map((m, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
+                    <div key={i} className="space-y-2 rounded-lg border border-gray-200 p-2">
+                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                        <input
+                          placeholder="Medicine name *"
+                          value={m.name}
+                          onChange={(e) => updateRow(i, 'name', e.target.value)}
+                          className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+                        />
+                        <input
+                          placeholder="Dosage (e.g. 1 tab / 500mg)"
+                          value={m.dosage || ''}
+                          onChange={(e) => updateRow(i, 'dosage', e.target.value)}
+                          className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+                        />
+                        {medicines.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeRow(i)}
+                            className="text-red-600 hover:text-red-800 text-sm p-1"
+                          >
+                            &times;
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input
+                          placeholder="Frequency (e.g. BID)"
+                          value={m.frequency || ''}
+                          onChange={(e) => updateRow(i, 'frequency', e.target.value)}
+                          className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+                        />
+                        <input
+                          placeholder="Duration (e.g. 5 days)"
+                          value={m.duration || ''}
+                          onChange={(e) => updateRow(i, 'duration', e.target.value)}
+                          className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+                        />
+                      </div>
                       <input
-                        placeholder="Name"
-                        value={m.name}
-                        onChange={(e) => updateRow(i, 'name', e.target.value)}
+                        placeholder="Instructions (optional)"
+                        value={m.instructions || ''}
+                        onChange={(e) => updateRow(i, 'instructions', e.target.value)}
                         className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
                       />
-                      <input
-                        placeholder="Dosage"
-                        value={m.dosage}
-                        onChange={(e) => updateRow(i, 'dosage', e.target.value)}
-                        className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-                      />
-                      <input
-                        placeholder="Duration"
-                        value={m.duration}
-                        onChange={(e) => updateRow(i, 'duration', e.target.value)}
-                        className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-                      />
-                      {medicines.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeRow(i)}
-                          className="text-red-600 hover:text-red-800 text-sm p-1"
-                        >
-                          &times;
-                        </button>
-                      )}
                     </div>
                   ))}
                 </div>

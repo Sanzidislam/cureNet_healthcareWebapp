@@ -4,6 +4,17 @@ import { logAudit } from '../lib/auditLog.js';
 import sequelize from '../config/database.js';
 
 const { Appointment, Doctor, Patient, User } = db;
+const RED_FLAG_TERMS = [
+  'chest pain',
+  'shortness of breath',
+  'breathing problem',
+  'stroke',
+  'fainting',
+  'unconscious',
+  'severe bleeding',
+  'suicidal',
+  'seizure',
+];
 
 function getClientIp(req) {
   return req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null;
@@ -22,7 +33,7 @@ export async function create(req, res) {
     if (user.role !== 'patient' || !user.patientId) {
       return res.status(403).json({ success: false, message: 'Not a patient' });
     }
-    const { doctorId, appointmentDate, window, type, reason, symptoms, timeBlock } = req.body;
+    const { doctorId, appointmentDate, window, type, reason, symptoms, timeBlock, triageConfirmed } = req.body;
     
     // Support both old (timeBlock) and new (window) booking styles
     if (!doctorId || !appointmentDate) {
@@ -37,6 +48,17 @@ export async function create(req, res) {
       return res.status(400).json({ success: false, message: 'Valid appointmentDate (YYYY-MM-DD) required' });
     }
 
+    const combinedNotes = `${reason || ''} ${symptoms || ''}`.toLowerCase();
+    const redFlags = RED_FLAG_TERMS.filter((term) => combinedNotes.includes(term));
+    if (redFlags.length > 0 && triageConfirmed !== true) {
+      return res.status(400).json({
+        success: false,
+        code: 'TRIAGE_CONFIRMATION_REQUIRED',
+        message: 'Red-flag symptoms detected. Please seek emergency care if needed and confirm to continue.',
+        data: { redFlags },
+      });
+    }
+
     const appointment = await sequelize.transaction(async (transaction) => {
       // Lock the doctor row to serialize booking operations per doctor.
       const doctor = await Doctor.findByPk(docId, {
@@ -44,6 +66,38 @@ export async function create(req, res) {
         lock: transaction.LOCK.UPDATE,
       });
       if (!doctor) return { error: { status: 404, message: 'Doctor not found' } };
+      const doctorUnavailableDates = Array.isArray(doctor.unavailableDates) ? doctor.unavailableDates : [];
+      if (doctorUnavailableDates.includes(appointmentDate)) {
+        return { error: { status: 409, message: 'Doctor is unavailable on this date' } };
+      }
+
+      // Require patient safety profile before first booking.
+      const totalAppointments = await Appointment.count({
+        where: { patientId: user.patientId },
+        transaction,
+      });
+      if (totalAppointments === 0) {
+        const patient = await Patient.findByPk(user.patientId, {
+          include: [{ model: User, as: 'User', attributes: ['phone', 'dateOfBirth'] }],
+          transaction,
+        });
+        const missingFields = [];
+        if (!patient?.bloodType) missingFields.push('bloodType');
+        if (!patient?.emergencyContact) missingFields.push('emergencyContact');
+        if (!patient?.emergencyPhone) missingFields.push('emergencyPhone');
+        if (!patient?.User?.phone) missingFields.push('phone');
+        if (!patient?.User?.dateOfBirth) missingFields.push('dateOfBirth');
+        if (missingFields.length > 0) {
+          return {
+            error: {
+              status: 400,
+              code: 'PROFILE_INCOMPLETE',
+              message: 'Complete your health profile before booking your first appointment',
+              data: { missingFields },
+            },
+          };
+        }
+      }
 
       let windowName = null;
       let serialNum = null;
@@ -111,7 +165,12 @@ export async function create(req, res) {
       return { created, windowName, serialNum };
     });
     if (appointment.error) {
-      return res.status(appointment.error.status).json({ success: false, message: appointment.error.message });
+      return res.status(appointment.error.status).json({
+        success: false,
+        ...(appointment.error.code ? { code: appointment.error.code } : {}),
+        message: appointment.error.message,
+        ...(appointment.error.data ? { data: appointment.error.data } : {}),
+      });
     }
     logAudit({
       action: 'appointment_created',
@@ -127,7 +186,16 @@ export async function create(req, res) {
         { model: Patient, as: 'Patient', include: [{ model: User, as: 'User', attributes: ['id', 'firstName', 'lastName'] }] },
       ],
     });
-    return res.status(201).json({ success: true, data: { appointment: formatAppointment(withAssocs) } });
+    return res.status(201).json({
+      success: true,
+      data: {
+        appointment: formatAppointment(withAssocs),
+        triage: {
+          redFlagDetected: redFlags.length > 0,
+          matchedTerms: redFlags,
+        },
+      },
+    });
   } catch (err) {
     console.error('Create appointment error:', err);
     return res.status(500).json({ success: false, message: err.message || 'Failed' });

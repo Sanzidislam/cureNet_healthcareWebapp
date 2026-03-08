@@ -22,7 +22,7 @@ export default function PatientDashboard() {
   const { data: statsData } = useQuery({
     queryKey: ['patients', patientId, 'dashboard-stats'],
     queryFn: async () => {
-      const { data } = await api.get<{ success: boolean; data: Record<string, number> }>(
+      const { data } = await api.get<{ success: boolean; data: Record<string, number> & { queue?: { profileComplete?: boolean; pendingActions?: number; needsProfileCompletion?: boolean } } }>(
         `/patients/${patientId}/dashboard/stats`
       );
       return data.data;
@@ -42,6 +42,7 @@ export default function PatientDashboard() {
   });
 
   const stats = statsData ?? {};
+  const queue = statsData?.queue ?? {};
   const appointments = appointmentsData ?? [];
 
   return (
@@ -97,15 +98,31 @@ export default function PatientDashboard() {
 
       <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-indigo-900">Complete Your Profile</h2>
-          <p className="text-sm text-indigo-700 mt-1">Add your medical history to help doctors provide better care.</p>
+          <h2 className="text-lg font-bold text-indigo-900">
+            {queue.needsProfileCompletion ? 'Complete Your Profile Before First Booking' : 'Care Action Queue'}
+          </h2>
+          <p className="text-sm text-indigo-700 mt-1">
+            {queue.needsProfileCompletion
+              ? 'Add required health and emergency details to safely start booking appointments.'
+              : `${queue.pendingActions ?? 0} pending action${(queue.pendingActions ?? 0) === 1 ? '' : 's'} in your care workflow.`}
+          </p>
         </div>
-        <Link
-          to="/app/patient-profile"
-          className="whitespace-nowrap rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors"
-        >
-          Complete profile
-        </Link>
+        <div className="flex gap-2">
+          {queue.needsProfileCompletion && (
+            <Link
+              to="/app/patient-profile"
+              className="whitespace-nowrap rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors"
+            >
+              Complete profile
+            </Link>
+          )}
+          <Link
+            to="/app/patient-appointments"
+            className="whitespace-nowrap rounded-xl border border-indigo-300 bg-white px-5 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+          >
+            Manage appointments
+          </Link>
+        </div>
       </div>
 
       {/* <div className="flex flex-wrap gap-3">

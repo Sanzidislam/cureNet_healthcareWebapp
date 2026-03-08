@@ -1,4 +1,5 @@
 import db from '../models/index.js';
+import { validatePrescriptionPayload } from '../lib/prescriptionValidation.js';
 
 const { Prescription, Appointment } = db;
 
@@ -37,9 +38,13 @@ export async function create(req, res) {
     if (user.role !== 'doctor' || !user.doctorId) {
       return res.status(403).json({ success: false, message: 'Not a doctor' });
     }
-    const { appointmentId, diagnosis, medicines, notes } = req.body;
+    const { appointmentId } = req.body;
     if (!appointmentId) {
       return res.status(400).json({ success: false, message: 'appointmentId required' });
+    }
+    const { value, errors } = validatePrescriptionPayload(req.body);
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, message: 'Validation failed', errors });
     }
     const appointment = await Appointment.findByPk(appointmentId);
     if (!appointment) {
@@ -57,9 +62,9 @@ export async function create(req, res) {
     }
     const prescription = await Prescription.create({
       appointmentId,
-      diagnosis: diagnosis || null,
-      medicines: Array.isArray(medicines) ? medicines : null,
-      notes: notes || null,
+      diagnosis: value.diagnosis,
+      medicines: value.medicines,
+      notes: value.notes,
     });
     return res.status(201).json({
       success: true,
@@ -78,7 +83,10 @@ export async function editPrescription(req, res) {
       return res.status(403).json({ success: false, message: 'Not a doctor' });
     }
     const prescriptionId = parseInt(req.params.id, 10);
-    const { diagnosis, medicines, notes } = req.body;
+    const { value, errors } = validatePrescriptionPayload(req.body);
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, message: 'Validation failed', errors });
+    }
     const prescription = await Prescription.findByPk(prescriptionId, {
       include: [{ model: Appointment, as: 'Appointment' }],
     });
@@ -88,7 +96,11 @@ export async function editPrescription(req, res) {
     if (prescription.Appointment.doctorId !== user.doctorId) {
       return res.status(403).json({ success: false, message: 'Not your prescription' });
     }
-    await prescription.update({ diagnosis, medicines, notes });
+    await prescription.update({
+      diagnosis: value.diagnosis,
+      medicines: value.medicines,
+      notes: value.notes,
+    });
     return res.json({
       success: true,
       data: { prescription: prescription.get({ plain: true }) },

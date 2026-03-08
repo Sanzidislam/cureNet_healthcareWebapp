@@ -20,6 +20,17 @@ interface AppointmentItem {
 }
 
 const STATUS_OPTIONS = ['', 'requested', 'approved', 'in_progress', 'completed', 'cancelled'];
+const RED_FLAG_TERMS = [
+  'chest pain',
+  'shortness of breath',
+  'breathing problem',
+  'stroke',
+  'fainting',
+  'unconscious',
+  'severe bleeding',
+  'suicidal',
+  'seizure',
+];
 
 export default function PatientAppointments() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -199,6 +210,10 @@ function BookAppointmentModal({ prefilledDoctorId, onClose }: BookAppointmentMod
   const [type, setType] = useState('in_person');
   const [reason, setReason] = useState('');
   const [symptoms, setSymptoms] = useState('');
+  const [triageConfirmed, setTriageConfirmed] = useState(false);
+  const combinedNotes = `${reason} ${symptoms}`.toLowerCase();
+  const matchedRedFlags = RED_FLAG_TERMS.filter((term) => combinedNotes.includes(term));
+  const hasRedFlags = matchedRedFlags.length > 0;
 
   const { data: doctors = [] } = useQuery({
     queryKey: ['doctors'],
@@ -208,20 +223,21 @@ function BookAppointmentModal({ prefilledDoctorId, onClose }: BookAppointmentMod
     },
   });
 
-  const { data: availableWindows = [], isLoading: windowsLoading } = useQuery({
+  const { data: windowData, isLoading: windowsLoading } = useQuery({
     queryKey: ['available-slots', doctorId, date],
     queryFn: async () => {
-      const { data: res } = await api.get<{ success: boolean; data: { windows: Array<{ window: string; label: string; timeRange: string; enabled: boolean; maxPatients: number | null; booked: number; spotsLeft: number; available: boolean }> } }>(
+      const { data: res } = await api.get<{ success: boolean; data: { windows: Array<{ window: string; label: string; timeRange: string; enabled: boolean; maxPatients: number | null; booked: number; spotsLeft: number; available: boolean }>; blackout?: boolean; message?: string } }>(
         `/doctors/${doctorId}/available-slots`,
         { params: { date } }
       );
-      return res.data?.windows ?? [];
+      return res.data ?? { windows: [] };
     },
     enabled: !!doctorId && !!date,
   });
+  const availableWindows = windowData?.windows ?? [];
 
   const createMutation = useMutation({
-    mutationFn: (body: { doctorId: number; appointmentDate: string; window: string; type: string; reason?: string; symptoms?: string }) =>
+    mutationFn: (body: { doctorId: number; appointmentDate: string; window: string; type: string; reason?: string; symptoms?: string; triageConfirmed?: boolean }) =>
       api.post('/appointments', body),
     onSuccess: () => {
       toast.success('Appointment requested');
@@ -230,7 +246,13 @@ function BookAppointmentModal({ prefilledDoctorId, onClose }: BookAppointmentMod
       queryClient.invalidateQueries({ queryKey: ['patients'] });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast.error(err.response?.data?.message ?? 'Failed to book');
+      const payload = err.response?.data as { message?: string; code?: string; data?: { missingFields?: string[] } } | undefined;
+      if (payload?.code === 'PROFILE_INCOMPLETE') {
+        const missing = payload.data?.missingFields?.join(', ') || 'required fields';
+        toast.error(`Complete your profile first: ${missing}`);
+        return;
+      }
+      toast.error(payload?.message ?? 'Failed to book');
     },
   });
 
@@ -240,6 +262,10 @@ function BookAppointmentModal({ prefilledDoctorId, onClose }: BookAppointmentMod
       toast.error('Please select doctor, date and window');
       return;
     }
+    if (hasRedFlags && !triageConfirmed) {
+      toast.error('Please acknowledge the red-flag warning before continuing');
+      return;
+    }
     createMutation.mutate({
       doctorId: Number(doctorId),
       appointmentDate: date,
@@ -247,6 +273,7 @@ function BookAppointmentModal({ prefilledDoctorId, onClose }: BookAppointmentMod
       type,
       reason: reason || undefined,
       symptoms: symptoms || undefined,
+      triageConfirmed: hasRedFlags ? triageConfirmed : undefined,
     });
   };
 
@@ -281,6 +308,7 @@ function BookAppointmentModal({ prefilledDoctorId, onClose }: BookAppointmentMod
                   setDate(e.target.value);
                   setSelectedWindow('');
                 }}
+                min={new Date().toISOString().slice(0, 10)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 required
               />
@@ -290,6 +318,10 @@ function BookAppointmentModal({ prefilledDoctorId, onClose }: BookAppointmentMod
                 <label className="block text-sm font-medium text-gray-700 mb-1">Window</label>
                 {windowsLoading ? (
                   <p className="text-sm text-gray-500">Loading windows...</p>
+                ) : windowData?.blackout ? (
+                  <p className="text-sm text-rose-700 bg-rose-50 rounded-lg px-3 py-2">
+                    {windowData.message ?? 'Doctor is unavailable on this date. Please choose another date.'}
+                  </p>
                 ) : availableWindows.length === 0 || availableWindows.every((w) => !w.available) ? (
                   <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
                     No available window for this date. Try another.
@@ -354,6 +386,23 @@ function BookAppointmentModal({ prefilledDoctorId, onClose }: BookAppointmentMod
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               />
             </div>
+            {hasRedFlags && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="font-semibold">Possible urgent symptoms detected.</p>
+                <p className="mt-1 text-xs">
+                  If this is an emergency, contact emergency services immediately. Matched terms: {matchedRedFlags.join(', ')}.
+                </p>
+                <label className="mt-2 flex items-start gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={triageConfirmed}
+                    onChange={(e) => setTriageConfirmed(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>I understand and still want to request a non-emergency consultation.</span>
+                </label>
+              </div>
+            )}
             <div className="flex gap-2 pt-2">
               <button
                 type="button"

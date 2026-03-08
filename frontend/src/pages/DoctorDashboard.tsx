@@ -123,6 +123,12 @@ type Review = {
   createdAt?: string;
 };
 
+type QueueSummary = {
+  pendingApprovals?: number;
+  todaysCareTasks?: number;
+  outstandingFollowUps?: number;
+};
+
 function StarRating({ score }: { score: number }) {
   return (
     <div className="flex items-center gap-0.5">
@@ -170,7 +176,7 @@ export default function DoctorDashboard() {
   const { data: statsData } = useQuery({
     queryKey: ['doctors', doctorId, 'dashboard-stats'],
     queryFn: async () => {
-      const { data } = await api.get<{ success: boolean; data: { stats: Record<string, number> } }>(
+      const { data } = await api.get<{ success: boolean; data: { stats: Record<string, number> & { queue?: QueueSummary } } }>(
         `/doctors/${doctorId}/dashboard/stats`
       );
       return data.data?.stats ?? {};
@@ -220,6 +226,7 @@ export default function DoctorDashboard() {
   });
 
   const stats = statsData ?? {};
+  const queue = (stats as Record<string, unknown>).queue as QueueSummary | undefined;
   const summary = ratingsData?.summary ?? { averageRating: 0, totalRatings: 0 };
   const recentReviews = (ratingsData?.ratings ?? []).slice(0, 5);
   const pendingCount = stats.requestedAppointments ?? 0;
@@ -280,6 +287,26 @@ export default function DoctorDashboard() {
           >
             Review <ArrowRightIcon className="w-4 h-4" />
           </Link>
+        </div>
+      )}
+
+      {queue && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <QueuePill
+            title="Pending Approvals"
+            value={queue.pendingApprovals ?? 0}
+            subtitle="Needs review"
+          />
+          <QueuePill
+            title="Today's Care Tasks"
+            value={queue.todaysCareTasks ?? 0}
+            subtitle="Actionable visits"
+          />
+          <QueuePill
+            title="Outstanding Follow-ups"
+            value={queue.outstandingFollowUps ?? 0}
+            subtitle="Recent completed without Rx"
+          />
         </div>
       )}
 
@@ -521,6 +548,16 @@ export default function DoctorDashboard() {
         </Link>
       </div>
 
+    </div>
+  );
+}
+
+function QueuePill({ title, value, subtitle }: { title: string; value: number; subtitle: string }) {
+  return (
+    <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">{title}</p>
+      <p className="text-2xl font-bold text-indigo-900">{value}</p>
+      <p className="text-xs text-indigo-700">{subtitle}</p>
     </div>
   );
 }

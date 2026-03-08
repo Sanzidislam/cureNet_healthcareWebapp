@@ -39,6 +39,7 @@ export async function getStats(req, res) {
       todayAppointments,
       completedToday,
       pendingToday,
+      pendingRequestsCount,
     ] = await Promise.all([
       User.count(),
       Doctor.count(),
@@ -53,6 +54,7 @@ export async function getStats(req, res) {
           status: { [Op.in]: ['requested', 'approved', 'in_progress'] },
         },
       }),
+      Appointment.count({ where: { status: 'requested' } }),
     ]);
     return res.json({
       success: true,
@@ -67,6 +69,11 @@ export async function getStats(req, res) {
           completedToday,
           pendingToday,
           reportsGenerated: 0,
+          queue: {
+            pendingDoctorVerifications: pendingDoctorCount,
+            pendingAppointmentApprovals: pendingRequestsCount,
+            todaysOperationalLoad: todayAppointments + pendingToday,
+          },
         },
       },
     });

@@ -4,12 +4,17 @@ import { fileURLToPath } from 'url';
 import { Op } from 'sequelize';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const { User, Doctor, Appointment, Rating } = db;
+const { User, Doctor, Appointment, Rating, Prescription } = db;
 
 const WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 function getWeekday(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
   return WEEKDAY_NAMES[d.getDay()];
+}
+
+function normalizeUnavailableDates(value) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value.filter((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))));
 }
 
 function formatDoctorResponse(doctor, user) {
@@ -74,11 +79,14 @@ export async function updateProfile(req, res) {
     const allowed = [
       'bmdcRegistrationNumber', 'department', 'experience', 'education', 'certifications',
       'hospital', 'location', 'consultationFee', 'bio', 'chamberTimes', 'chamberWindows', 'degrees', 'awards',
-      'languages', 'services',
+      'languages', 'services', 'unavailableDates',
     ];
     const updates = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+    if (updates.unavailableDates !== undefined) {
+      updates.unavailableDates = normalizeUnavailableDates(updates.unavailableDates);
     }
     await doctor.update(updates);
     const updated = await Doctor.findByPk(doctor.id, {
@@ -124,7 +132,10 @@ export async function getDashboardStats(req, res) {
       return res.status(403).json({ success: false, message: 'Unauthorized' });
     }
     const today = new Date().toISOString().slice(0, 10);
-    const [totalAppointments, todayAppointments, completedAppointments, pendingAppointments, requestedAppointments, inProgressAppointments, totalPatients] = await Promise.all([
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    const dateFrom = fourteenDaysAgo.toISOString().slice(0, 10);
+    const [totalAppointments, todayAppointments, completedAppointments, pendingAppointments, requestedAppointments, inProgressAppointments, totalPatients, completedRecent] = await Promise.all([
       Appointment.count({ where: { doctorId } }),
       Appointment.count({ where: { doctorId, appointmentDate: today, status: { [Op.notIn]: ['cancelled', 'rejected'] } } }),
       Appointment.count({ where: { doctorId, status: 'completed' } }),
@@ -132,7 +143,24 @@ export async function getDashboardStats(req, res) {
       Appointment.count({ where: { doctorId, status: 'requested' } }),
       Appointment.count({ where: { doctorId, status: 'in_progress' } }),
       Appointment.count({ where: { doctorId }, distinct: true, col: 'patientId' }),
+      Appointment.findAll({
+        where: {
+          doctorId,
+          status: 'completed',
+          appointmentDate: { [Op.gte]: dateFrom },
+        },
+        attributes: ['id'],
+        raw: true,
+      }),
     ]);
+    const completedIds = completedRecent.map((a) => a.id);
+    let outstandingFollowUps = 0;
+    if (completedIds.length > 0) {
+      const prescribedCount = await Prescription.count({
+        where: { appointmentId: { [Op.in]: completedIds } },
+      });
+      outstandingFollowUps = Math.max(0, completedIds.length - prescribedCount);
+    }
     return res.json({
       success: true,
       data: {
@@ -144,6 +172,11 @@ export async function getDashboardStats(req, res) {
           requestedAppointments,
           inProgressAppointments,
           totalPatients,
+          queue: {
+            pendingApprovals: requestedAppointments,
+            todaysCareTasks: requestedAppointments + pendingAppointments + inProgressAppointments,
+            outstandingFollowUps,
+          },
         },
       },
     });
@@ -219,6 +252,17 @@ export async function getAvailableSlots(req, res) {
     const weekday = getWeekday(date);
     const chamberWindows = doctor.chamberWindows || {};
     const dayWindows = chamberWindows[weekday] || {};
+    const unavailableDates = normalizeUnavailableDates(doctor.unavailableDates);
+    if (unavailableDates.includes(date)) {
+      return res.json({
+        success: true,
+        data: {
+          windows: [],
+          blackout: true,
+          message: 'Doctor is unavailable on this date',
+        },
+      });
+    }
     
     const windows = [
       { key: 'morning', label: 'Morning (09:00–13:00)', timeRange: '09:00–13:00' },
@@ -311,6 +355,7 @@ export async function getUpcomingSlots(req, res) {
     if (!doctor.verified) {
       return res.status(404).json({ success: false, message: 'Doctor not found' });
     }
+    const unavailableDates = new Set(normalizeUnavailableDates(doctor.unavailableDates));
     const chamberTimes = doctor.chamberTimes || {};
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const slots = [];
@@ -319,6 +364,7 @@ export async function getUpcomingSlots(req, res) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
       const dateStr = d.toISOString().slice(0, 10);
+      if (unavailableDates.has(dateStr)) continue;
       const weekday = dayNames[d.getDay()];
       const timeBlocks = Array.isArray(chamberTimes[weekday]) ? chamberTimes[weekday] : [];
       if (timeBlocks.length === 0) continue;

@@ -61,10 +61,9 @@ export default function Doctors() {
     enabled: !!data?.length,
   });
 
-  const doctors = data ?? [];
-
   // Filter doctors by search query in memory
   const filteredDoctors = useMemo(() => {
+    const doctors = data ?? [];
     if (!searchQuery.trim()) return doctors;
     const lowerQuery = searchQuery.toLowerCase();
 
@@ -76,7 +75,7 @@ export default function Doctors() {
 
       return fullName.includes(lowerQuery) || docDepartment.includes(lowerQuery);
     });
-  }, [doctors, searchQuery]);
+  }, [data, searchQuery]);
 
   return (
     <div className="flex flex-col bg-slate-50 min-h-screen font-sans">

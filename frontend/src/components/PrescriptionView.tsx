@@ -6,11 +6,33 @@ interface PrescriptionViewProps {
   onClose: () => void;
 }
 
+interface MedicineEntry {
+  name?: string;
+  dosage?: string;
+  frequency?: string;
+  duration?: string;
+  instructions?: string;
+  // Backward compatibility with structured schema
+  strength?: string;
+  dose?: string;
+  unit?: string;
+  route?: string;
+}
+
+function formatMedicine(m: MedicineEntry): string {
+  const dosage = m.dosage || [m.dose, m.unit].filter(Boolean).join(' ');
+  const details = [dosage, m.frequency, m.duration].filter(Boolean).join(' | ');
+  const legacy = [m.strength, m.route].filter(Boolean).join(' | ');
+  const extra = m.instructions ? ` (${m.instructions})` : '';
+  const core = `${m.name || 'Medicine'}${details ? ` — ${details}` : ''}${extra}`;
+  return legacy ? `${core} [${legacy}]` : core;
+}
+
 export default function PrescriptionView({ appointmentId, onClose }: PrescriptionViewProps) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['prescription', appointmentId],
     queryFn: async () => {
-      const { data: res } = await api.get<{ success: boolean; data: { prescription: { diagnosis?: string; medicines?: { name?: string; dosage?: string; duration?: string }[]; notes?: string } } }>(
+      const { data: res } = await api.get<{ success: boolean; data: { prescription: { diagnosis?: string; medicines?: MedicineEntry[]; notes?: string } } }>(
         `/prescriptions/appointment/${appointmentId}`
       );
       return res.data?.prescription;
@@ -40,11 +62,7 @@ export default function PrescriptionView({ appointmentId, onClose }: Prescriptio
                   <p className="font-medium text-gray-700">Medicines</p>
                   <ul className="list-disc list-inside text-gray-600 space-y-1">
                     {prescription.medicines.map((m, i) => (
-                      <li key={i}>
-                        {m.name}
-                        {m.dosage && ` — ${m.dosage}`}
-                        {m.duration && ` (${m.duration})`}
-                      </li>
+                      <li key={i}>{formatMedicine(m)}</li>
                     ))}
                   </ul>
                 </div>
